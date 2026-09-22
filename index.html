@@ -220,7 +220,7 @@
 <div class="wrap">
   <header>
     <h1>🏡 Our Home Dashboard</h1>
-    <span>tasks · shopping · meals</span>
+    <span id="sync-status">connecting…</span>
   </header>
 
   <nav>
@@ -273,10 +273,25 @@
   </section>
 </div>
 
-<script>
-// In-memory state, local to this browser for now.
-// TODO(firebase): replace loadState()/scheduleSave() bodies below with
-// Firestore reads/writes once Firebase is connected, for real cross-device sync.
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB-2jQpNIOtTjX47aOZExkCCY1mir9axA4",
+  authDomain: "home-dashboard-fb38a.firebaseapp.com",
+  projectId: "home-dashboard-fb38a",
+  storageBucket: "home-dashboard-fb38a.firebasestorage.app",
+  messagingSenderId: "1093394313648",
+  appId: "1:1093394313648:web:96b52896bc14dbaf8d6675"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+// Matches the security rule path: /family-dashboard/{docId}
+const stateRef = doc(db, "family-dashboard", "shared-state");
+
 let state = {
   tasks: [],
   storeOrder: ['Grocery','Costco','Indian','Amazon','Walmart'],
@@ -286,14 +301,76 @@ let state = {
 const daysOfWeek = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const mealTypes = ['breakfast','lunch','dinner'];
 
-function loadState(){
+let saveTimer = null;
+let remoteVersion = null;      // JSON of the last data we know Firestore has (ours or theirs)
+let pendingRemoteData = null;  // a remote update that arrived while you were mid-edit
+
+function setSyncStatus(text){
+  const el = document.getElementById('sync-status');
+  if(el) el.innerText = text;
+}
+function isEditingSomething(){
+  const el = document.activeElement;
+  if(!el) return false;
+  return el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.isContentEditable;
+}
+function applyRemoteData(data){
+  state = Object.assign({tasks:[],storeOrder:[],shopping:{},meals:{}}, data);
+  remoteVersion = JSON.stringify(data);
   initMealsState();
   renderAll();
+  setSyncStatus('updated ' + new Date().toLocaleTimeString());
 }
 
-// No-op until Firebase is wired in — every mutation function below already
-// calls this, so once you add Firestore writes here, saving "just works".
-function scheduleSave(){}
+function loadState(){
+  setSyncStatus('connecting…');
+  onSnapshot(stateRef, (snap)=>{
+    if(!snap.exists()){
+      setSyncStatus('ready — add something to get started');
+      initMealsState();
+      renderAll();
+      return;
+    }
+    const data = snap.data();
+    const json = JSON.stringify(data);
+    if(json === remoteVersion) return; // this is just our own save echoing back
+    if(isEditingSomething()){
+      pendingRemoteData = data; // apply once you're done typing
+      return;
+    }
+    applyRemoteData(data);
+  }, (err)=>{
+    console.error(err);
+    setSyncStatus('connection error — check console');
+  });
+}
+
+// Apply any queued remote update as soon as you stop editing something
+document.addEventListener('focusout', ()=>{
+  setTimeout(()=>{
+    if(pendingRemoteData && !isEditingSomething()){
+      applyRemoteData(pendingRemoteData);
+      pendingRemoteData = null;
+    }
+  }, 50);
+});
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  setSyncStatus('saving…');
+  saveTimer = setTimeout(saveToFirestore, 500);
+}
+async function saveToFirestore(){
+  try{
+    await setDoc(stateRef, state);
+    remoteVersion = JSON.stringify(state);
+    setSyncStatus('synced ' + new Date().toLocaleTimeString());
+  } catch(e){
+    console.error(e);
+    setSyncStatus('save failed — retrying…');
+    saveTimer = setTimeout(saveToFirestore, 3000);
+  }
+}
 
 function switchTab(tabId){
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -559,6 +636,16 @@ function renderAll(){
 }
 
 loadState();
+
+// Inline onclick/onkeydown/oninput attributes in the HTML look functions up
+// on window — expose the ones referenced there (module scripts don't leak
+// declarations to global scope the way classic scripts do).
+Object.assign(window, {
+  switchTab, addTask, toggleTask, deleteTask,
+  addStore, removeStore, renameStore,
+  addShoppingItem, toggleShoppingItem, clearCheckedShopping,
+  updateMeal
+});
 </script>
 </body>
 </html>
