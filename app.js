@@ -15,6 +15,22 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const stateRef = doc(db, "family-dashboard", "shared-state");
 
+// UPDATED DEFAULT PIN
+const DASHBOARD_PIN = "258963"; 
+
+// 10 Customizable Master Templates
+const QUICK_TEMPLATES = [
+  "🧺 Laundry", "🍳 Cooking", "🗑️ Trash Pickup", "🛒 Grocery Run", 
+  "🧽 Clean Kitchen", "🪴 Water Plants", "🍽️ Dishwasher", 
+  "📦 Mail/Packages", "🧹 Vacuum", "🌿 Lawn Care"
+];
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/home/sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+}
+
 let state = {
   tasks: [],
   storeOrder: ['Grocery','Costco','Indian','Amazon','Walmart'],
@@ -22,10 +38,46 @@ let state = {
   meals: {}
 };
 const mealTypes = ['breakfast','lunch','dinner'];
+let currentTaskFilter = 'all';
 
 let saveTimer = null;
 let remoteVersion = null;
 let pendingRemoteData = null;
+
+function checkPinAuth(){
+  const savedPin = localStorage.getItem('dash_pin_auth');
+  const overlay = document.getElementById('pin-overlay');
+  if(savedPin === DASHBOARD_PIN){
+    overlay.style.display = 'none';
+    loadState();
+  } else {
+    overlay.style.display = 'flex';
+  }
+}
+
+function verifyPin(){
+  const input = document.getElementById('pin-input');
+  const errEl = document.getElementById('pin-error');
+  const val = input.value.trim();
+
+  if(val === DASHBOARD_PIN){
+    localStorage.setItem('dash_pin_auth', val);
+    document.getElementById('pin-overlay').style.display = 'none';
+    errEl.innerText = '';
+    loadState();
+  } else {
+    errEl.innerText = 'Incorrect PIN. Please try again.';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function lockDashboard(){
+  localStorage.removeItem('dash_pin_auth');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').innerText = '';
+  document.getElementById('pin-overlay').style.display = 'flex';
+}
 
 function setSyncStatus(text){
   const el = document.getElementById('sync-status');
@@ -98,11 +150,14 @@ function switchTab(tabId){
   document.getElementById('tab-'+tabId).classList.add('active');
 }
 
-// Format YYYY-MM-DD for clean dates
+// LOCAL PHONE TIMEZONE DATE HELPER (YYYY-MM-DD)
 function getTodayKey(offsetDays = 0){
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function formatDateLabel(dateStr){
@@ -111,7 +166,6 @@ function formatDateLabel(dateStr){
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-// --- ARCHIVE TOGGLE VISIBILITY ---
 function initArchiveVisibility(){
   const isCollapsed = localStorage.getItem('archive_collapsed') === 'true';
   const content = document.getElementById('archive-content');
@@ -133,21 +187,83 @@ function toggleArchiveVisibility(){
   localStorage.setItem('archive_collapsed', isNowCollapsed);
 }
 
+// --- MASTER FILTER & TEMPLATES ---
+function setTaskFilter(filter){
+  currentTaskFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.getElementById('filter-' + filter.toLowerCase());
+  if(activeBtn) activeBtn.classList.add('active');
+  renderTasks();
+}
+
+function renderTemplates(){
+  const container = document.getElementById('template-pills');
+  if(!container) return;
+  container.innerHTML = '';
+  QUICK_TEMPLATES.forEach(text => {
+    const btn = document.createElement('button');
+    btn.className = 'template-pill';
+    btn.innerText = text;
+    btn.onclick = () => addQuickTemplateTask(text);
+    container.appendChild(btn);
+  });
+}
+
+function addQuickTemplateTask(text){
+  state.tasks.push({
+    id: Date.now() + Math.random(),
+    text,
+    column: 'today',
+    assignee: '',
+    completed: false,
+    completedDate: null
+  });
+  renderTasks();
+  scheduleSave();
+}
+
 // --- TASKS ---
 function addTask(){
   const textInput = document.getElementById('task-input');
   const colSelect = document.getElementById('task-column');
+  const assignSelect = document.getElementById('task-assignee');
   const text = textInput.value.trim();
   if(!text) return;
+
   state.tasks.push({ 
     id: Date.now() + Math.random(), 
     text, 
-    column: colSelect.value, 
+    column: colSelect.value,
+    assignee: assignSelect.value,
     completed: false,
     completedDate: null
   });
   textInput.value = '';
   textInput.focus();
+  renderTasks();
+  scheduleSave();
+}
+
+function updateTaskText(id, newTextRaw){
+  const newText = newTextRaw.trim();
+  state.tasks = state.tasks.map(t => {
+    if(t.id === id) return { ...t, text: newText || t.text };
+    return t;
+  });
+  renderTasks();
+  scheduleSave();
+}
+
+function cycleAssignee(id){
+  const assignees = ['', 'Siva', 'Priya'];
+  state.tasks = state.tasks.map(t => {
+    if(t.id === id){
+      const currIdx = assignees.indexOf(t.assignee || '');
+      const nextIdx = (currIdx + 1) % assignees.length;
+      return { ...t, assignee: assignees[nextIdx] };
+    }
+    return t;
+  });
   renderTasks();
   scheduleSave();
 }
@@ -187,8 +303,13 @@ function moveTask(id, newColumn, beforeId){
 }
 
 function renderTasks(){
-  // Active (uncompleted) tasks
-  const activeTasks = state.tasks.filter(t => !t.completed);
+  let activeTasks = state.tasks.filter(t => !t.completed);
+
+  // Apply Master User Filter
+  if(currentTaskFilter === 'Siva') activeTasks = activeTasks.filter(t => t.assignee === 'Siva');
+  else if(currentTaskFilter === 'Priya') activeTasks = activeTasks.filter(t => t.assignee === 'Priya');
+  else if(currentTaskFilter === 'none') activeTasks = activeTasks.filter(t => !t.assignee);
+
   ['today','week','someday'].forEach(col=>{
     const listEl = document.getElementById('list-'+col);
     const countEl = document.getElementById('count-'+col);
@@ -197,23 +318,46 @@ function renderTasks(){
     listEl.innerHTML = '';
     filtered.forEach(task=>{
       const li = document.createElement('li');
-      li.className = 'task-item';
+      const assigneeClass = task.assignee ? ` assignee-${task.assignee.toLowerCase()}` : '';
+      li.className = 'task-item' + assigneeClass;
       li.dataset.id = task.id;
+
+      const badgeHtml = task.assignee ? `<span class="assignee-badge ${task.assignee.toLowerCase()}">${task.assignee}</span>` : '';
+
       li.innerHTML = `
         <span class="drag-handle">⠿⠿</span>
         <label onclick="toggleTask(${task.id})">
           <input type="checkbox" onclick="event.stopPropagation(); toggleTask(${task.id})">
-          <span>${escapeHtml(task.text)}</span>
+          <span class="task-text-edit" contenteditable="true" spellcheck="false"
+            onclick="event.stopPropagation();"
+            onblur="updateTaskText(${task.id}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">${escapeHtml(task.text)}</span>
         </label>
+        ${badgeHtml}
         <button onclick="deleteTask(${task.id})">✕</button>
       `;
+
+      // Long press or right click to cycle task assignee
+      let pressTimer = null;
+      li.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+          if(navigator.vibrate) navigator.vibrate(50);
+          cycleAssignee(task.id);
+        }, 500);
+      }, { passive: true });
+      li.addEventListener('touchend', () => clearTimeout(pressTimer));
+      li.addEventListener('touchmove', () => clearTimeout(pressTimer));
+      li.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        cycleAssignee(task.id);
+      });
+
       listEl.appendChild(li);
       const handle = li.querySelector('.drag-handle');
       handle.addEventListener('pointerdown', (e)=>startDrag(e, task.id, li));
     });
   });
 
-  // Archive (completed) tasks sorted by date
   renderArchive();
 }
 
@@ -230,7 +374,6 @@ function renderArchive(){
     return;
   }
 
-  // Group completed tasks by date
   const groups = {};
   completedTasks.forEach(task => {
     const dateKey = task.completedDate || 'Earlier';
@@ -238,7 +381,6 @@ function renderArchive(){
     groups[dateKey].push(task);
   });
 
-  // Sort dates descending (newest first)
   const sortedDates = Object.keys(groups).sort().reverse();
 
   sortedDates.forEach(dateKey => {
@@ -257,11 +399,13 @@ function renderArchive(){
       const li = document.createElement('li');
       li.className = 'task-item done';
       li.dataset.id = task.id;
+      const badgeHtml = task.assignee ? `<span class="assignee-badge ${task.assignee.toLowerCase()}">${task.assignee}</span>` : '';
       li.innerHTML = `
         <label onclick="toggleTask(${task.id})">
           <input type="checkbox" checked onclick="event.stopPropagation(); toggleTask(${task.id})">
           <span>${escapeHtml(task.text)}</span>
         </label>
+        ${badgeHtml}
         <button onclick="deleteTask(${task.id})">✕</button>
       `;
       ul.appendChild(li);
@@ -379,14 +523,29 @@ function renameStore(oldName, newNameRaw){
   renderShopping();
   scheduleSave();
 }
+
+// Streamlined Add with comma-splitting & auto-focus
 function addShoppingItem(store, inputEl){
   const text = inputEl.value.trim();
   if(!text) return;
-  state.shopping[store].push({ id: Date.now()+Math.random(), text, checked:false });
-  inputEl.value = '';
+
+  // Split by comma to allow adding multiple items in one go
+  const itemsToAdd = text.split(',').map(s => s.trim()).filter(Boolean);
+  itemsToAdd.forEach(itemText => {
+    state.shopping[store].push({ id: Date.now() + Math.random(), text: itemText, checked: false });
+  });
+
   renderShopping();
   scheduleSave();
+
+  // Re-focus input box automatically
+  const newCardInput = document.querySelector(`[data-store-input="${store}"]`);
+  if(newCardInput){
+    newCardInput.value = '';
+    newCardInput.focus();
+  }
 }
+
 function toggleShoppingItem(store, id){
   state.shopping[store] = state.shopping[store].map(it => it.id===id ? {...it, checked:!it.checked} : it);
   renderShopping();
@@ -422,7 +581,7 @@ function renderShopping(){
       <ul>${itemsHtml}</ul>
       ${items.some(i=>i.checked) ? `<button class="clear-btn" onclick="clearCheckedShopping('${store}')">🧹 Clear checked</button>` : ''}
       <div class="shop-add">
-        <input type="text" placeholder="Add item…" onkeydown="if(event.key==='Enter'){addShoppingItem('${store}', this);}">
+        <input type="text" data-store-input="${store}" placeholder="Add item(s), e.g. Milk, Eggs…" onkeydown="if(event.key==='Enter'){addShoppingItem('${store}', this);}">
         <button type="button" onclick="addShoppingItem('${store}', this.previousElementSibling)">Add</button>
       </div>
     `;
@@ -471,14 +630,15 @@ function renderAll(){
   renderTasks();
   renderShopping();
   renderMeals();
+  renderTemplates();
   initArchiveVisibility();
 }
 
-loadState();
+checkPinAuth();
 
 Object.assign(window, {
-  switchTab, addTask, toggleTask, deleteTask,
+  switchTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
-  updateMeal, toggleArchiveVisibility
+  updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard
 });
