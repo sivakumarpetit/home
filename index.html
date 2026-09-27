@@ -4,13 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Family Dashboard</title>
+
+  <!-- PWA Manifest & Custom App Icons -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#5c6b4a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Dashboard">
+  <link rel="apple-touch-icon" href="/home/icon.png">
+
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- PIN Entry Gate Overlay -->
+<div id="pin-overlay" class="pin-overlay">
+  <div class="pin-card">
+    <h2>🔐 Access Required</h2>
+    <p>Please enter your PIN to view the family dashboard.</p>
+    <div class="pin-input-group">
+      <input type="password" id="pin-input" placeholder="Enter PIN…" onkeydown="if(event.key==='Enter'){verifyPin();}">
+      <button type="button" onclick="verifyPin()">Unlock</button>
+    </div>
+    <p id="pin-error" class="pin-error"></p>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <h1>🏡 Our Home Dashboard</h1>
-    <span id="sync-status">connecting…</span>
+    <div class="header-right">
+      <span id="sync-status">connecting…</span>
+      <button type="button" class="lock-btn" onclick="lockDashboard()" title="Lock Dashboard">🔒 Lock</button>
+    </div>
   </header>
 
   <nav>
@@ -20,6 +46,21 @@
   </nav>
 
   <section id="section-tasks" class="tab-content active">
+    <!-- Master User Filter Bar -->
+    <div class="filter-bar">
+      <span>Filter Tasks:</span>
+      <button class="filter-btn active" id="filter-all" onclick="setTaskFilter('all')">All</button>
+      <button class="filter-btn filter-siva" id="filter-siva" onclick="setTaskFilter('Siva')">Siva</button>
+      <button class="filter-btn filter-priya" id="filter-priya" onclick="setTaskFilter('Priya')">Priya</button>
+      <button class="filter-btn" id="filter-none" onclick="setTaskFilter('none')">Unassigned</button>
+    </div>
+
+    <!-- Quick Templates Picker -->
+    <div class="template-picker">
+      <span class="template-title">⚡ Quick Add Today:</span>
+      <div class="template-pills" id="template-pills"></div>
+    </div>
+
     <div class="task-cols">
       <div class="task-col" data-column="today">
         <h3>Today <small id="count-today">0</small></h3>
@@ -34,8 +75,14 @@
         <ul class="task-list" id="list-someday"></ul>
       </div>
     </div>
+
     <div class="add-row">
       <input id="task-input" type="text" placeholder="Add a task…" onkeydown="if(event.key==='Enter'){addTask();}">
+      <select id="task-assignee">
+        <option value="">No Assignee</option>
+        <option value="Siva">Siva</option>
+        <option value="Priya">Priya</option>
+      </select>
       <select id="task-column">
         <option value="today">Today</option>
         <option value="week">This Week</option>
