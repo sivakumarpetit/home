@@ -1,10 +1,11 @@
-const CACHE_NAME = 'family-dashboard-v1';
+const CACHE_NAME = 'family-dashboard-v2';
 const ASSETS = [
-  '/home/',
-  '/home/index.html',
-  '/home/styles.css',
-  '/home/app.js',
-  '/home/manifest.json'
+  './',
+  'index.html',
+  'styles.css',
+  'app.js',
+  'manifest.json',
+  'icon.jpg'
 ];
 
 self.addEventListener('install', (event) => {
