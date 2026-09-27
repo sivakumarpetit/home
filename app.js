@@ -25,7 +25,7 @@ const DEFAULT_TEMPLATES = [
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/home/sw.js').catch(err => console.log('SW registration failed:', err));
+    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
   });
 }
 
@@ -87,9 +87,28 @@ function isEditingSomething(){
   if(!el) return false;
   return el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.isContentEditable;
 }
+
+function sanitizeData(data){
+  const cleanTasks = (data.tasks || []).map(t => ({
+    id: t.id || (Date.now() + Math.random()),
+    text: t.text || 'Untitled Task',
+    column: t.column || 'today',
+    assignee: t.assignee || '',
+    completed: Boolean(t.completed),
+    completedDate: t.completedDate || null
+  }));
+
+  return {
+    tasks: cleanTasks,
+    templates: Array.isArray(data.templates) && data.templates.length ? data.templates : [...DEFAULT_TEMPLATES],
+    storeOrder: Array.isArray(data.storeOrder) && data.storeOrder.length ? data.storeOrder : ['Grocery','Costco','Indian','Amazon','Walmart'],
+    shopping: data.shopping || { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
+    meals: data.meals || {}
+  };
+}
+
 function applyRemoteData(data){
-  state = Object.assign({tasks:[],templates:[...DEFAULT_TEMPLATES],storeOrder:[],shopping:{},meals:{}}, data);
-  if(!state.templates || !state.templates.length) state.templates = [...DEFAULT_TEMPLATES];
+  state = sanitizeData(data);
   remoteVersion = JSON.stringify(data);
   renderAll();
   setSyncStatus('updated ' + new Date().toLocaleTimeString());
