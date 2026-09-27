@@ -15,11 +15,9 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const stateRef = doc(db, "family-dashboard", "shared-state");
 
-// UPDATED DEFAULT PIN
 const DASHBOARD_PIN = "258963"; 
 
-// 10 Customizable Master Templates
-const QUICK_TEMPLATES = [
+const DEFAULT_TEMPLATES = [
   "🧺 Laundry", "🍳 Cooking", "🗑️ Trash Pickup", "🛒 Grocery Run", 
   "🧽 Clean Kitchen", "🪴 Water Plants", "🍽️ Dishwasher", 
   "📦 Mail/Packages", "🧹 Vacuum", "🌿 Lawn Care"
@@ -33,6 +31,7 @@ if ('serviceWorker' in navigator) {
 
 let state = {
   tasks: [],
+  templates: [...DEFAULT_TEMPLATES],
   storeOrder: ['Grocery','Costco','Indian','Amazon','Walmart'],
   shopping: { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
   meals: {}
@@ -89,7 +88,8 @@ function isEditingSomething(){
   return el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.isContentEditable;
 }
 function applyRemoteData(data){
-  state = Object.assign({tasks:[],storeOrder:[],shopping:{},meals:{}}, data);
+  state = Object.assign({tasks:[],templates:[...DEFAULT_TEMPLATES],storeOrder:[],shopping:{},meals:{}}, data);
+  if(!state.templates || !state.templates.length) state.templates = [...DEFAULT_TEMPLATES];
   remoteVersion = JSON.stringify(data);
   renderAll();
   setSyncStatus('updated ' + new Date().toLocaleTimeString());
@@ -150,7 +150,6 @@ function switchTab(tabId){
   document.getElementById('tab-'+tabId).classList.add('active');
 }
 
-// LOCAL PHONE TIMEZONE DATE HELPER (YYYY-MM-DD)
 function getTodayKey(offsetDays = 0){
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -200,13 +199,39 @@ function renderTemplates(){
   const container = document.getElementById('template-pills');
   if(!container) return;
   container.innerHTML = '';
-  QUICK_TEMPLATES.forEach(text => {
-    const btn = document.createElement('button');
-    btn.className = 'template-pill';
-    btn.innerText = text;
-    btn.onclick = () => addQuickTemplateTask(text);
-    container.appendChild(btn);
+
+  (state.templates || DEFAULT_TEMPLATES).forEach((text, index) => {
+    const pill = document.createElement('div');
+    pill.className = 'template-pill';
+    pill.innerHTML = `
+      <span class="pill-text">${escapeHtml(text)}</span>
+      <button type="button" class="del-pill" title="Remove Template" onclick="event.stopPropagation(); removeTemplate(${index})">✕</button>
+    `;
+    pill.onclick = () => addQuickTemplateTask(text);
+    container.appendChild(pill);
   });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-pill-btn';
+  addBtn.innerText = '+ Custom';
+  addBtn.onclick = promptAddTemplate;
+  container.appendChild(addBtn);
+}
+
+function promptAddTemplate(){
+  const text = prompt('Enter a new recurring quick-add template:');
+  if(!text || !text.trim()) return;
+  if(!state.templates) state.templates = [];
+  state.templates.push(text.trim());
+  renderTemplates();
+  scheduleSave();
+}
+
+function removeTemplate(index){
+  if(!state.templates) return;
+  state.templates.splice(index, 1);
+  renderTemplates();
+  scheduleSave();
 }
 
 function addQuickTemplateTask(text){
@@ -305,7 +330,6 @@ function moveTask(id, newColumn, beforeId){
 function renderTasks(){
   let activeTasks = state.tasks.filter(t => !t.completed);
 
-  // Apply Master User Filter
   if(currentTaskFilter === 'Siva') activeTasks = activeTasks.filter(t => t.assignee === 'Siva');
   else if(currentTaskFilter === 'Priya') activeTasks = activeTasks.filter(t => t.assignee === 'Priya');
   else if(currentTaskFilter === 'none') activeTasks = activeTasks.filter(t => !t.assignee);
@@ -322,35 +346,20 @@ function renderTasks(){
       li.className = 'task-item' + assigneeClass;
       li.dataset.id = task.id;
 
-      const badgeHtml = task.assignee ? `<span class="assignee-badge ${task.assignee.toLowerCase()}">${task.assignee}</span>` : '';
+      const chipLabel = task.assignee || '+ Assign';
+      const chipClass = task.assignee ? task.assignee.toLowerCase() : '';
 
       li.innerHTML = `
         <span class="drag-handle">⠿⠿</span>
-        <label onclick="toggleTask(${task.id})">
-          <input type="checkbox" onclick="event.stopPropagation(); toggleTask(${task.id})">
-          <span class="task-text-edit" contenteditable="true" spellcheck="false"
-            onclick="event.stopPropagation();"
-            onblur="updateTaskText(${task.id}, this.innerText)"
-            onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">${escapeHtml(task.text)}</span>
-        </label>
-        ${badgeHtml}
-        <button onclick="deleteTask(${task.id})">✕</button>
+        <div class="task-checkbox-wrap">
+          <input type="checkbox" onchange="toggleTask(${task.id})">
+        </div>
+        <span class="task-text-edit" contenteditable="true" spellcheck="false"
+          onblur="updateTaskText(${task.id}, this.innerText)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">${escapeHtml(task.text)}</span>
+        <button type="button" class="assignee-chip ${chipClass}" onclick="cycleAssignee(${task.id})">${chipLabel}</button>
+        <button type="button" onclick="deleteTask(${task.id})">✕</button>
       `;
-
-      // Long press or right click to cycle task assignee
-      let pressTimer = null;
-      li.addEventListener('touchstart', (e) => {
-        pressTimer = setTimeout(() => {
-          if(navigator.vibrate) navigator.vibrate(50);
-          cycleAssignee(task.id);
-        }, 500);
-      }, { passive: true });
-      li.addEventListener('touchend', () => clearTimeout(pressTimer));
-      li.addEventListener('touchmove', () => clearTimeout(pressTimer));
-      li.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        cycleAssignee(task.id);
-      });
 
       listEl.appendChild(li);
       const handle = li.querySelector('.drag-handle');
@@ -399,14 +408,15 @@ function renderArchive(){
       const li = document.createElement('li');
       li.className = 'task-item done';
       li.dataset.id = task.id;
-      const badgeHtml = task.assignee ? `<span class="assignee-badge ${task.assignee.toLowerCase()}">${task.assignee}</span>` : '';
+      const chipLabel = task.assignee || 'Unassigned';
+      const chipClass = task.assignee ? task.assignee.toLowerCase() : '';
       li.innerHTML = `
-        <label onclick="toggleTask(${task.id})">
-          <input type="checkbox" checked onclick="event.stopPropagation(); toggleTask(${task.id})">
-          <span>${escapeHtml(task.text)}</span>
-        </label>
-        ${badgeHtml}
-        <button onclick="deleteTask(${task.id})">✕</button>
+        <div class="task-checkbox-wrap">
+          <input type="checkbox" checked onchange="toggleTask(${task.id})">
+        </div>
+        <span style="flex:1;">${escapeHtml(task.text)}</span>
+        <span class="assignee-chip ${chipClass}">${chipLabel}</span>
+        <button type="button" onclick="deleteTask(${task.id})">✕</button>
       `;
       ul.appendChild(li);
     });
@@ -524,12 +534,10 @@ function renameStore(oldName, newNameRaw){
   scheduleSave();
 }
 
-// Streamlined Add with comma-splitting & auto-focus
 function addShoppingItem(store, inputEl){
   const text = inputEl.value.trim();
   if(!text) return;
 
-  // Split by comma to allow adding multiple items in one go
   const itemsToAdd = text.split(',').map(s => s.trim()).filter(Boolean);
   itemsToAdd.forEach(itemText => {
     state.shopping[store].push({ id: Date.now() + Math.random(), text: itemText, checked: false });
@@ -538,7 +546,6 @@ function addShoppingItem(store, inputEl){
   renderShopping();
   scheduleSave();
 
-  // Re-focus input box automatically
   const newCardInput = document.querySelector(`[data-store-input="${store}"]`);
   if(newCardInput){
     newCardInput.value = '';
@@ -637,7 +644,8 @@ function renderAll(){
 checkPinAuth();
 
 Object.assign(window, {
-  switchTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask,
+  switchTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask, cycleAssignee,
+  promptAddTemplate, removeTemplate,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
   updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard
