@@ -23,6 +23,8 @@ const DEFAULT_TEMPLATES = [
   "📦 Mail/Packages", "🧹 Vacuum", "🌿 Lawn Care"
 ];
 
+const LIFT_OPTIONS = ["Squat", "Deadlift", "Bench Press", "Overhead Press"];
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
@@ -34,10 +36,16 @@ let state = {
   templates: [...DEFAULT_TEMPLATES],
   storeOrder: ['Grocery','Costco','Indian','Amazon','Walmart'],
   shopping: { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
-  meals: {}
+  meals: {},
+  workouts: {}
 };
 const mealTypes = ['breakfast','lunch','dinner'];
 let currentTaskFilter = 'all';
+
+// WORKOUT CALENDAR NAV & SELECTION STATE
+let viewYear = new Date().getFullYear();
+let viewMonth = new Date().getMonth(); // 0-indexed
+let activeSelectedIsoDate = getIsoDateKey(0); // Default to today
 
 let saveTimer = null;
 let remoteVersion = null;
@@ -98,12 +106,25 @@ function sanitizeData(data){
     completedDate: t.completedDate || null
   }));
 
+  const cleanWorkouts = {};
+  if(data.workouts && typeof data.workouts === 'object'){
+    Object.keys(data.workouts).forEach(dateKey => {
+      const item = data.workouts[dateKey] || {};
+      cleanWorkouts[dateKey] = {
+        type: ['running','strength','rest'].includes(item.type) ? item.type : null,
+        mileage: typeof item.mileage === 'number' ? item.mileage : (parseFloat(item.mileage) || null),
+        lifts: Array.isArray(item.lifts) ? item.lifts.filter(l => LIFT_OPTIONS.includes(l)) : []
+      };
+    });
+  }
+
   return {
     tasks: cleanTasks,
     templates: Array.isArray(data.templates) && data.templates.length ? data.templates : [...DEFAULT_TEMPLATES],
     storeOrder: Array.isArray(data.storeOrder) && data.storeOrder.length ? data.storeOrder : ['Grocery','Costco','Indian','Amazon','Walmart'],
     shopping: data.shopping || { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
-    meals: data.meals || {}
+    meals: data.meals || {},
+    workouts: cleanWorkouts
   };
 }
 
@@ -169,7 +190,7 @@ function switchTab(tabId){
   document.getElementById('tab-'+tabId).classList.add('active');
 }
 
-function getTodayKey(offsetDays = 0){
+function getIsoDateKey(offsetDays = 0){
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   const year = d.getFullYear();
@@ -319,7 +340,7 @@ function toggleTask(id){
       return {
         ...t,
         completed: isNowDone,
-        completedDate: isNowDone ? getTodayKey() : null
+        completedDate: isNowDone ? getIsoDateKey(0) : null
       };
     }
     return t;
@@ -627,7 +648,7 @@ function renderMeals(){
   tbody.innerHTML = '';
 
   for(let i = 0; i < 7; i++){
-    const dateKey = getTodayKey(i);
+    const dateKey = getIsoDateKey(i);
     const labelText = i === 0 ? `Today (${formatDateLabel(dateKey)})` : formatDateLabel(dateKey);
     
     if(!state.meals[dateKey]){
@@ -646,6 +667,304 @@ function renderMeals(){
   }
 }
 
+// --- WORKOUTS ENGINE ---
+function getWorkout(dateKey){
+  return state.workouts[dateKey] || { type: null, mileage: null, lifts: [] };
+}
+
+function setWorkoutType(dateKey, type){
+  const curr = getWorkout(dateKey);
+  if(curr.type === type) return;
+  state.workouts[dateKey] = {
+    ...curr,
+    type: type
+  };
+  renderWorkouts();
+  scheduleSave();
+}
+
+function setWorkoutMileage(dateKey, mileageVal){
+  const curr = getWorkout(dateKey);
+  const num = parseFloat(mileageVal);
+  state.workouts[dateKey] = {
+    ...curr,
+    mileage: !isNaN(num) && num >= 0 ? num : null
+  };
+  renderWorkoutsStatsOnly();
+  scheduleSave();
+}
+
+function toggleWorkoutLift(dateKey, liftName){
+  const curr = getWorkout(dateKey);
+  const currentLifts = curr.lifts || [];
+  const exists = currentLifts.includes(liftName);
+  const nextLifts = exists 
+    ? currentLifts.filter(l => l !== liftName)
+    : [...currentLifts, liftName];
+
+  state.workouts[dateKey] = {
+    ...curr,
+    lifts: nextLifts
+  };
+  renderWorkoutsStatsOnly();
+  scheduleSave();
+}
+
+function selectCalendarDate(isoDateKey){
+  activeSelectedIsoDate = isoDateKey;
+  renderWorkouts();
+}
+
+function changeMonth(delta){
+  viewMonth += delta;
+  if(viewMonth < 0){
+    viewMonth = 11;
+    viewYear--;
+  } else if(viewMonth > 11){
+    viewMonth = 0;
+    viewYear++;
+  }
+  renderWorkoutCalendar();
+}
+
+function renderWorkoutsStatsOnly(){
+  renderWorkoutStats();
+  renderWorkoutCalendar();
+}
+
+function renderWorkoutStats(){
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const currentQuarter = Math.floor(currentMonth / 3);
+
+  // Total days in targets
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  
+  // Calculate total days in current quarter
+  const qStartMonth = currentQuarter * 3;
+  const daysInCurrentQuarter = new Date(currentYear, qStartMonth + 3, 0).getDate() 
+    + new Date(currentYear, qStartMonth + 2, 0).getDate() 
+    + new Date(currentYear, qStartMonth + 1, 0).getDate();
+
+  const isLeapYear = (currentYear % 4 === 0 && currentYear % 100 !== 0) || (currentYear % 400 === 0);
+  const daysInCurrentYear = isLeapYear ? 366 : 365;
+
+  let thisWeekCount = 0;
+  let thisMonthCount = 0;
+  let thisQuarterCount = 0;
+  let thisYearCount = 0;
+  let totalMiles = 0;
+  const liftCounts = { "Squat": 0, "Deadlift": 0, "Bench Press": 0, "Overhead Press": 0 };
+
+  // Calculate Last 7 Days (This Week)
+  for(let i = 0; i >= -6; i--){
+    const k = getIsoDateKey(i);
+    const w = getWorkout(k);
+    if(w.type === 'running' || w.type === 'strength'){
+      thisWeekCount++;
+    }
+  }
+
+  Object.keys(state.workouts).forEach(dateStr => {
+    const w = state.workouts[dateStr];
+    if(!w) return;
+
+    const [yStr, mStr] = dateStr.split('-');
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10) - 1; // 0-indexed
+    const q = Math.floor(m / 3);
+
+    const isRealWorkout = w.type === 'running' || w.type === 'strength';
+
+    if(isRealWorkout){
+      if(y === currentYear) {
+        thisYearCount++;
+        if(q === currentQuarter) {
+          thisQuarterCount++;
+          if(m === currentMonth) {
+            thisMonthCount++;
+          }
+        }
+      }
+    }
+
+    if(w.type === 'running' && typeof w.mileage === 'number' && !isNaN(w.mileage)){
+      totalMiles += w.mileage;
+    }
+
+    if(w.type === 'strength' && Array.isArray(w.lifts)){
+      w.lifts.forEach(l => {
+        if(liftCounts[l] !== undefined) liftCounts[l]++;
+      });
+    }
+  });
+
+  // Determine Top Lift
+  let topLift = '—';
+  let maxLiftCount = 0;
+  Object.keys(liftCounts).forEach(l => {
+    if(liftCounts[l] > maxLiftCount){
+      maxLiftCount = liftCounts[l];
+      topLift = l;
+    }
+  });
+
+  document.getElementById('stat-week').innerText = `${thisWeekCount}/7`;
+  document.getElementById('stat-month').innerText = `${thisMonthCount}/${daysInCurrentMonth}`;
+  document.getElementById('stat-month-lbl').innerText = `${monthNames[currentMonth]}`;
+  document.getElementById('stat-quarter').innerText = `${thisQuarterCount}/${daysInCurrentQuarter}`;
+  document.getElementById('stat-year').innerText = `${thisYearCount}/${daysInCurrentYear}`;
+  document.getElementById('stat-miles').innerText = totalMiles.toFixed(1);
+  document.getElementById('stat-toplift').innerText = topLift;
+}
+
+function renderWorkoutCalendar(){
+  const gridEl = document.getElementById('calendar-days-grid');
+  const titleEl = document.getElementById('calendar-month-title');
+  if(!gridEl) return;
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  titleEl.innerText = `${monthNames[viewMonth]} ${viewYear}`;
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const startWeekday = firstDay.getDay(); // 0 = Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayIso = getIsoDateKey(0);
+
+  gridEl.innerHTML = '';
+
+  // Leading blank cells
+  for(let i = 0; i < startWeekday; i++){
+    const blank = document.createElement('div');
+    blank.className = 'cal-cell empty';
+    gridEl.appendChild(blank);
+  }
+
+  // Month day cells
+  for(let day = 1; day <= daysInMonth; day++){
+    const mStr = String(viewMonth + 1).padStart(2, '0');
+    const dStr = String(day).padStart(2, '0');
+    const dateKey = `${viewYear}-${mStr}-${dStr}`;
+    const w = getWorkout(dateKey);
+
+    const dateObj = new Date(viewYear, viewMonth, day);
+    const dayOfWeek = dateObj.getDay();
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+    const cell = document.createElement('div');
+    let typeClass = '';
+    if(w.type === 'running') typeClass = ' type-running';
+    else if(w.type === 'strength') typeClass = ' type-strength';
+    else if(w.type === 'rest') typeClass = ' type-rest';
+
+    const isWeekendClass = isWeekend ? ' is-weekend' : '';
+    const isTodayClass = dateKey === todayIso ? ' is-today' : '';
+    const isSelectedClass = dateKey === activeSelectedIsoDate ? ' is-selected' : '';
+
+    cell.className = 'cal-cell' + isWeekendClass + typeClass + isTodayClass + isSelectedClass;
+    cell.innerText = day;
+    cell.onclick = () => selectCalendarDate(dateKey);
+
+    // Build Hover/Long-press Tooltip Detail
+    if(w.type === 'running'){
+      const mi = w.mileage ? `${w.mileage} mi` : 'Run';
+      cell.title = `${formatDateLabel(dateKey)}: Running (${mi})`;
+    } else if(w.type === 'strength'){
+      const liftsStr = w.lifts && w.lifts.length ? w.lifts.join(', ') : 'No lifts selected';
+      cell.title = `${formatDateLabel(dateKey)}: Strength (${liftsStr})`;
+    } else if(w.type === 'rest'){
+      cell.title = `${formatDateLabel(dateKey)}: Rest Day`;
+    } else {
+      cell.title = formatDateLabel(dateKey);
+    }
+
+    gridEl.appendChild(cell);
+  }
+}
+
+function renderDayCard(dateKey){
+  const w = getWorkout(dateKey);
+  const todayIso = getIsoDateKey(0);
+  const isToday = dateKey === todayIso;
+
+  const card = document.createElement('div');
+  card.className = `day-card ${isToday ? 'card-today' : ''}`;
+
+  const dateLabelText = isToday ? `Today (${formatDateLabel(dateKey)})` : formatDateLabel(dateKey);
+  const todayBadgeHtml = isToday ? `<span class="today-badge">Today</span>` : '';
+
+  let contentHtml = '';
+  if(w.type === 'running'){
+    const milesVal = typeof w.mileage === 'number' ? w.mileage : '';
+    contentHtml = `
+      <div class="workout-input-panel">
+        <div class="running-input-wrap">
+          <input type="number" step="0.1" min="0" placeholder="Miles" value="${milesVal}"
+            oninput="setWorkoutMileage('${dateKey}', this.value)">
+          <span class="running-unit">miles</span>
+        </div>
+      </div>
+    `;
+  } else if(w.type === 'strength'){
+    const selectedLifts = w.lifts || [];
+    const chipsHtml = LIFT_OPTIONS.map(lift => {
+      const isSel = selectedLifts.includes(lift);
+      return `
+        <button type="button" class="lift-chip ${isSel ? 'selected' : ''}"
+          onclick="toggleWorkoutLift('${dateKey}', '${lift}')">
+          ${isSel ? '✓ ' : ''}${lift}
+        </button>
+      `;
+    }).join('');
+
+    contentHtml = `
+      <div class="workout-input-panel">
+        <div class="lift-chips-grid">
+          ${chipsHtml}
+        </div>
+      </div>
+    `;
+  } else if(w.type === 'rest'){
+    contentHtml = `
+      <div class="workout-input-panel">
+        <div class="rest-note">😴 Resting on this day.</div>
+      </div>
+    `;
+  }
+
+  card.innerHTML = `
+    <div class="day-card-head">
+      <div class="day-card-date">
+        📅 ${dateLabelText} ${todayBadgeHtml}
+      </div>
+    </div>
+    <div class="segmented-picker">
+      <button type="button" class="seg-btn seg-running ${w.type === 'running' ? 'active' : ''}"
+        onclick="setWorkoutType('${dateKey}', 'running')">🏃 Run</button>
+      <button type="button" class="seg-btn seg-strength ${w.type === 'strength' ? 'active' : ''}"
+        onclick="setWorkoutType('${dateKey}', 'strength')">🏋️ Strength</button>
+      <button type="button" class="seg-btn seg-rest ${w.type === 'rest' ? 'active' : ''}"
+        onclick="setWorkoutType('${dateKey}', 'rest')">😴 Rest</button>
+    </div>
+    ${contentHtml}
+  `;
+
+  return card;
+}
+
+function renderWorkouts(){
+  renderWorkoutStats();
+  renderWorkoutCalendar();
+
+  const activeContainer = document.getElementById('workout-active-day-container');
+  if(activeContainer){
+    activeContainer.innerHTML = '';
+    activeContainer.appendChild(renderDayCard(activeSelectedIsoDate));
+  }
+}
+
 function escapeHtml(str){
   const div = document.createElement('div');
   div.innerText = str;
@@ -657,6 +976,7 @@ function renderAll(){
   renderShopping();
   renderMeals();
   renderTemplates();
+  renderWorkouts();
   initArchiveVisibility();
 }
 
@@ -667,5 +987,6 @@ Object.assign(window, {
   promptAddTemplate, removeTemplate,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
-  updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard
+  updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard,
+  setWorkoutType, setWorkoutMileage, toggleWorkoutLift, selectCalendarDate, changeMonth
 });

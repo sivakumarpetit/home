@@ -33,7 +33,7 @@
 
 <div class="wrap">
   <header>
-    <h1>🏡 Siva & Priya Home Dashboard</h1>
+    <h1>🏡 Our Home Dashboard</h1>
     <div class="header-right">
       <span id="sync-status">connecting…</span>
       <button type="button" class="lock-btn" onclick="lockDashboard()" title="Lock Dashboard">🔒 Lock</button>
@@ -44,10 +44,11 @@
     <button class="tab-btn active" id="tab-tasks" onclick="switchTab('tasks')">📋 Tasks</button>
     <button class="tab-btn" id="tab-shopping" onclick="switchTab('shopping')">🛒 Shopping</button>
     <button class="tab-btn" id="tab-meals" onclick="switchTab('meals')">🍳 Meals</button>
+    <button class="tab-btn" id="tab-workout" onclick="switchTab('workout')">🏋️ Workouts</button>
   </nav>
 
+  <!-- TASKS SECTION -->
   <section id="section-tasks" class="tab-content active">
-    <!-- Master User Filter Bar -->
     <div class="filter-bar">
       <span>Filter Tasks:</span>
       <button class="filter-btn active" id="filter-all" onclick="setTaskFilter('all')">All</button>
@@ -56,7 +57,6 @@
       <button class="filter-btn" id="filter-none" onclick="setTaskFilter('none')">Unassigned</button>
     </div>
 
-    <!-- Quick Templates Picker -->
     <div class="template-picker">
       <div class="template-header">
         <span class="template-title">⚡ Quick Add Today (Tap to add):</span>
@@ -94,7 +94,6 @@
       <button type="button" onclick="addTask()">Add</button>
     </div>
 
-    <!-- Hideable Completed Tasks Archive -->
     <div class="archive-wrap">
       <div class="archive-header" onclick="toggleArchiveVisibility()">
         <h3>📦 Completed Archive (<span id="count-archive">0</span>)</h3>
@@ -106,6 +105,7 @@
     </div>
   </section>
 
+  <!-- SHOPPING SECTION -->
   <section id="section-shopping" class="tab-content">
     <div class="shop-grid" id="shopping-grid"></div>
     <div class="add-store-row">
@@ -114,6 +114,7 @@
     </div>
   </section>
 
+  <!-- MEALS SECTION -->
   <section id="section-meals" class="tab-content">
     <div class="meal-table-wrap">
       <table>
@@ -121,6 +122,64 @@
         <tbody id="meal-table-body"></tbody>
       </table>
     </div>
+  </section>
+
+  <!-- SIVA'S WORKOUTS SECTION -->
+  <section id="section-workout" class="tab-content">
+    <h2 class="section-title">Siva's Workouts</h2>
+
+    <!-- Full-Dataset Historical Stats Grid -->
+    <div class="workout-stats-grid">
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-week">0/7</span>
+        <span class="workout-stat-lbl">This Week</span>
+      </div>
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-month">0/30</span>
+        <span class="workout-stat-lbl" id="stat-month-lbl">This Month</span>
+      </div>
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-quarter">0/91</span>
+        <span class="workout-stat-lbl">This Quarter</span>
+      </div>
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-year">0/365</span>
+        <span class="workout-stat-lbl">This Year</span>
+      </div>
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-miles">0.0</span>
+        <span class="workout-stat-lbl">Miles Logged</span>
+      </div>
+      <div class="workout-stat-card">
+        <span class="workout-stat-val" id="stat-toplift">—</span>
+        <span class="workout-stat-lbl">Top Lift</span>
+      </div>
+    </div>
+
+    <!-- Monthly Calendar View -->
+    <div class="workout-card calendar-card">
+      <div class="calendar-header">
+        <button type="button" class="cal-nav-btn" onclick="changeMonth(-1)">◀ Prev</button>
+        <h3 id="calendar-month-title">Current Month</h3>
+        <button type="button" class="cal-nav-btn" onclick="changeMonth(1)">Next ▶</button>
+      </div>
+      <div class="calendar-grid-wrap">
+        <div class="calendar-weekdays">
+          <span class="is-weekend">Su</span>
+          <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span>
+          <span class="is-weekend">Sa</span>
+        </div>
+        <div class="calendar-days" id="calendar-days-grid"></div>
+      </div>
+      <div class="calendar-legend">
+        <div class="legend-item"><span class="legend-swatch swatch-running"></span> Running</div>
+        <div class="legend-item"><span class="legend-swatch swatch-strength"></span> Strength</div>
+        <div class="legend-item"><span class="legend-swatch swatch-rest"></span> Rest</div>
+      </div>
+    </div>
+
+    <!-- Active Selected Date Card for Logging -->
+    <div id="workout-active-day-container"></div>
   </section>
 </div>
 
