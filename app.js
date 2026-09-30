@@ -1015,20 +1015,23 @@ function renderDayCard(dateKey){
 
       const setsLog = w.setsLog || [];
 
-      // Warm-up
+      // Warm-up Sets (3 individual checkable sets @ 50% TM x 5 reps)
       setsHtml += `<div class="set-section-header">Warm-Up</div>`;
       setsHtml += renderPlateVisualizer(warmUpWeight);
-      setsHtml += `
-        <div class="set-row">
-          <div class="set-info">
-            <span class="set-title">Warm-up Set</span>
-            <span class="set-detail">50% TM (${warmUpWeight} lbs) × 3 reps (5 sets)</span>
+      for(let i = 1; i <= 3; i++){
+        const logIdx = i - 1; // 0, 1, 2
+        setsHtml += `
+          <div class="set-row">
+            <div class="set-info">
+              <span class="set-title">Warm-up Set ${i}</span>
+              <span class="set-detail">50% TM (${warmUpWeight} lbs) × 5 reps</span>
+            </div>
+            <div class="set-action">
+              <input type="checkbox" ${setsLog[logIdx] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', ${logIdx}, this.checked)">
+            </div>
           </div>
-          <div class="set-action">
-            <input type="checkbox" ${setsLog[0] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 0, this.checked)">
-          </div>
-        </div>
-      `;
+        `;
+      }
 
       // Main Sets
       setsHtml += `<div class="set-section-header">Main Sets (5/3/1)</div>`;
@@ -1040,7 +1043,7 @@ function renderDayCard(dateKey){
             <span class="set-detail">${Math.round(currPercentages[0]*100)}% TM (${main1Weight} lbs) × ${currReps[0]} reps</span>
           </div>
           <div class="set-action">
-            <input type="checkbox" ${setsLog[1] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 1, this.checked)">
+            <input type="checkbox" ${setsLog[3] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 3, this.checked)">
           </div>
         </div>
       `;
@@ -1053,7 +1056,7 @@ function renderDayCard(dateKey){
             <span class="set-detail">${Math.round(currPercentages[1]*100)}% TM (${main2Weight} lbs) × ${currReps[1]} reps</span>
           </div>
           <div class="set-action">
-            <input type="checkbox" ${setsLog[2] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 2, this.checked)">
+            <input type="checkbox" ${setsLog[4] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 4, this.checked)">
           </div>
         </div>
       `;
@@ -1067,17 +1070,17 @@ function renderDayCard(dateKey){
           </div>
           <div class="set-action">
             <input type="number" class="reps-input" placeholder="Reps" min="0" value="${w.amrapReps || ''}" oninput="setAmrapReps('${dateKey}', this.value)">
-            <input type="checkbox" ${setsLog[3] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 3, this.checked)">
+            <input type="checkbox" ${setsLog[5] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 5, this.checked)">
           </div>
         </div>
       `;
 
-      // BBB Supplemental
+      // BBB Supplemental Sets
       setsHtml += `<div class="set-section-header">BBB Supplemental (5x${w.bbbReps || '10'} @ 50%)</div>`;
       if (bbbWeight !== main3Weight) setsHtml += renderPlateVisualizer(bbbWeight);
 
       for(let i = 1; i <= 5; i++){
-        const logIdx = 3 + i;
+        const logIdx = 5 + i; // 6, 7, 8, 9, 10
         setsHtml += `
           <div class="set-row">
             <div class="set-info">
