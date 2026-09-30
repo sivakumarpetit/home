@@ -13,6 +13,7 @@
   --siva-bg: #ebf8ff;
   --priya-color: #9b2c2c;
   --priya-bg: #fff5f5;
+  --plate-bar: #8a8377;
 }
 
 * { box-sizing: border-box; }
@@ -361,7 +362,7 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 .swatch-strength { background: var(--olive); }
 .swatch-rest { background: var(--rest-gray); }
 
-/* DAY CARDS */
+/* DAY CARDS & GENERATOR */
 .day-card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -380,7 +381,7 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 }
 .day-card-date {
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink);
   display: flex;
@@ -415,7 +416,7 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
   background: transparent;
   color: var(--muted);
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   border-radius: 4px;
   cursor: pointer;
@@ -435,65 +436,166 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 .seg-btn.active.seg-strength { color: var(--olive); }
 .seg-btn.active.seg-rest { color: var(--ink); }
 
-/* CONDITIONAL WORKOUT CONTENT */
+/* CONDITIONAL WORKOUT CONTENT & GENERATOR FORM */
 .workout-input-panel { margin-top: 10px; }
-.running-input-wrap {
+.running-input-grid {
   display: flex;
-  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-.running-input-wrap input {
+.running-input-grid select,
+.running-input-grid input {
   font-family: 'Helvetica Neue', Arial, sans-serif;
   font-size: 15px;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  width: 140px;
   min-height: 44px;
-  outline: none;
+  background: #fff;
 }
-.running-input-wrap input:focus { border-color: var(--olive); }
-.running-unit {
+.running-input-grid input[type="number"] { width: 140px; }
+
+.bbb-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.bbb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bbb-form-group label {
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted);
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.bbb-form-group input,
+.bbb-form-group select {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
 }
 
-/* STRENGTH 2x2 LIFT CHIPS GRID */
-.lift-chips-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.lift-chip {
-  min-height: 44px;
-  border: 1px solid var(--line);
-  background: #f5f3ee;
-  color: var(--muted);
-  border-radius: 6px;
+.gen-btn {
+  width: 100%;
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px;
+  background: var(--olive);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+.gen-btn:hover { background: var(--olive-dark); }
+
+/* 5/3/1 LOGGED SETS DISPLAY & LARGER TOUCH TARGETS */
+.set-section-header {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--olive-dark);
+  text-transform: uppercase;
+  margin: 16px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  gap: 12px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+.set-row:last-child { border-bottom: none; }
+.set-info { display: flex; flex-direction: column; gap: 2px; }
+.set-title { font-weight: 700; font-size: 15px; color: var(--ink); }
+.set-detail { font-size: 13px; color: var(--muted); }
+.set-action { display: flex; align-items: center; gap: 12px; }
+
+/* LARGER TOUCH-FRIENDLY CHECKBOXES */
+.set-action input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  accent-color: var(--olive);
+}
+
+/* LARGER AMRAP REPS INPUT BOX */
+.reps-input {
+  width: 70px;
+  padding: 8px 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* VISUAL BARBELL PLATE LOADER - EXACT PALETTE COLORS */
+.plate-loader {
+  background: #f7f4ee;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.barbell-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.12s ease;
+  height: 54px;
+  width: 100%;
+  overflow-x: auto;
 }
-.lift-chip:hover { border-color: var(--olive); }
-.lift-chip.selected {
-  background: var(--olive);
-  color: #fff;
-  border-color: var(--olive);
-  font-weight: 700;
+.side-plates { display: flex; align-items: center; gap: 2px; }
+.side-plates.left { flex-direction: row-reverse; }
+.bar-center { height: 10px; width: 80px; background-color: var(--plate-bar); }
+.plate {
+  color: #fff; font-size: 10px; font-weight: bold;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 2px; border: 1px solid #1e293b;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* SPECIFIED PLATE COLORS */
+.plate-55 { height: 54px; width: 13px; background: #dc2626; } /* Red */
+.plate-45 { height: 50px; width: 12px; background: #2563eb; } /* Blue */
+.plate-35 { height: 44px; width: 11px; background: #ca8a04; } /* Yellow */
+.plate-25 { height: 38px; width: 10px; background: #16a34a; } /* Green */
+.plate-15 { height: 32px; width: 9px;  background: #ea580c; } /* Orange */
+.plate-10 { height: 26px; width: 8px;  background: #475569; } /* Grey */
+.plate-2-5 { height: 20px; width: 6px; background: #94a3b8; color: #fff; } /* Small Grey */
+
+.plate-text-summary {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .rest-note {
   font-family: 'Helvetica Neue', Arial, sans-serif;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--muted);
   font-style: italic;
   padding: 4px 2px;
@@ -512,6 +614,7 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
   .add-store-row button { flex: 1; }
 
   .workout-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .bbb-form-grid { grid-template-columns: 1fr; }
 
   .meal-table-wrap table, .meal-table-wrap thead, .meal-table-wrap tbody,
   .meal-table-wrap tr, .meal-table-wrap td { display: block; width: 100%; }
