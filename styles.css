@@ -849,4 +849,7 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
   .meal-table-wrap td:last-child { border-bottom: none; }
   .meal-table-wrap td:first-child { background: var(--olive); color: #fff; width: auto; font-size: 13px; letter-spacing: .3px; }
   .meal-table-wrap td:not(:first-child)::before {
-    content: attr(data-label); display: block;
+    content: attr(data-label); display: block; font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.5px; color: var(--muted); margin-bottom: 3px;
+  }
+}
