@@ -2,187 +2,272 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Family Dashboard</title>
-
-  <!-- PWA Manifest & Custom App Icons -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#5c6b4a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Dashboard">
-  <link rel="apple-touch-icon" href="icon.png">
-  <link rel="shortcut icon" href="icon.png">
-
   <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#faf7f2">
+  <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
-<!-- PIN Entry Gate Overlay -->
-<div id="pin-overlay" class="pin-overlay">
-  <div class="pin-card">
-    <h2>🔐 Access Required</h2>
-    <p>Please enter your PIN to view the family dashboard.</p>
-    <div class="pin-input-group">
-      <input type="password" id="pin-input" placeholder="Enter PIN…" onkeydown="if(event.key==='Enter'){verifyPin();}">
-      <button type="button" onclick="verifyPin()">Unlock</button>
+  <!-- SECURITY PIN OVERLAY -->
+  <div id="pin-overlay" class="pin-overlay">
+    <div class="pin-card">
+      <h2>Family Dashboard</h2>
+      <p>Enter PIN to access your family hub</p>
+      <div class="pin-input-group">
+        <input type="password" id="pin-input" id="pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyPin()">
+        <button type="button" onclick="verifyPin()">Unlock</button>
+      </div>
+      <p id="pin-error" class="pin-error"></p>
     </div>
-    <p id="pin-error" class="pin-error"></p>
   </div>
-</div>
 
-<div class="wrap">
-  <header>
-    <h1>🏡 Our Home Dashboard</h1>
-    <div class="header-right">
-      <span id="sync-status">connecting…</span>
-      <button type="button" class="lock-btn" onclick="lockDashboard()" title="Lock Dashboard">🔒 Lock</button>
-    </div>
-  </header>
+  <!-- APP SHELL / SIDEBAR CONTAINER -->
+  <div class="app-layout">
+    
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h2>Family Hub</h2>
+        <span id="sync-status">connecting…</span>
+      </div>
+      <nav class="sidebar-nav">
+        <button type="button" class="nav-btn active" id="nav-main" onclick="switchSidebarTab('main')">
+          <span class="nav-icon">🏠</span> Main
+        </button>
+        <button type="button" class="nav-btn" id="nav-workouts" onclick="switchSidebarTab('workouts')">
+          <span class="nav-icon">🏋️</span> Workouts
+        </button>
+        <button type="button" class="nav-btn" id="nav-events" onclick="switchSidebarTab('events')">
+          <span class="nav-icon">📅</span> Events
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button type="button" class="lock-btn" onclick="lockDashboard()">🔒 Lock</button>
+      </div>
+    </aside>
 
-  <nav>
-    <button class="tab-btn active" id="tab-tasks" onclick="switchTab('tasks')">📋 Tasks</button>
-    <button class="tab-btn" id="tab-shopping" onclick="switchTab('shopping')">🛒 Shopping</button>
-    <button class="tab-btn" id="tab-meals" onclick="switchTab('meals')">🍳 Meals</button>
-    <button class="tab-btn" id="tab-workout" onclick="switchTab('workout')">🏋️ Workouts</button>
-  </nav>
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-viewport">
 
-  <!-- TASKS SECTION -->
-  <section id="section-tasks" class="tab-content active">
-    <div class="filter-bar">
-      <span>Filter Tasks:</span>
-      <button class="filter-btn active" id="filter-all" onclick="setTaskFilter('all')">All</button>
-      <button class="filter-btn filter-siva" id="filter-siva" onclick="setTaskFilter('Siva')">Siva</button>
-      <button class="filter-btn filter-priya" id="filter-priya" onclick="setTaskFilter('Priya')">Priya</button>
-      <button class="filter-btn" id="filter-none" onclick="setTaskFilter('none')">Unassigned</button>
-    </div>
+      <!-- MAIN TAB SECTION (TASKS, MEALS, SHOPPING) -->
+      <section id="section-main" class="view-section active">
+        <header class="section-header">
+          <h1>Main Workspace</h1>
+        </header>
 
-    <div class="template-picker">
-      <div class="template-header">
-        <span class="template-title">⚡ Quick Add Today (Tap to add):</span>
-      </div>
-      <div class="template-pills" id="template-pills"></div>
-    </div>
-
-    <div class="task-cols">
-      <div class="task-col" data-column="today">
-        <h3>Today <small id="count-today">0</small></h3>
-        <ul class="task-list" id="list-today"></ul>
-      </div>
-      <div class="task-col" data-column="week">
-        <h3>This Week <small id="count-week">0</small></h3>
-        <ul class="task-list" id="list-week"></ul>
-      </div>
-      <div class="task-col" data-column="someday">
-        <h3>Someday <small id="count-someday">0</small></h3>
-        <ul class="task-list" id="list-someday"></ul>
-      </div>
-    </div>
-
-    <div class="add-row">
-      <input id="task-input" type="text" placeholder="Add a task…" onkeydown="if(event.key==='Enter'){addTask();}">
-      <select id="task-assignee">
-        <option value="">No Assignee</option>
-        <option value="Siva">Siva</option>
-        <option value="Priya">Priya</option>
-      </select>
-      <select id="task-column">
-        <option value="today">Today</option>
-        <option value="week">This Week</option>
-        <option value="someday">Someday</option>
-      </select>
-      <button type="button" onclick="addTask()">Add</button>
-    </div>
-
-    <div class="archive-wrap">
-      <div class="archive-header" onclick="toggleArchiveVisibility()">
-        <h3>📦 Completed Archive (<span id="count-archive">0</span>)</h3>
-        <button type="button" class="archive-toggle-btn" id="archive-toggle-btn">▼ Hide</button>
-      </div>
-      <div id="archive-content" class="archive-content">
-        <div id="archive-list-container"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SHOPPING SECTION -->
-  <section id="section-shopping" class="tab-content">
-    <div class="shop-grid" id="shopping-grid"></div>
-    <div class="add-store-row">
-      <input id="new-store-input" type="text" placeholder="New store name…" onkeydown="if(event.key==='Enter'){addStore();}">
-      <button type="button" onclick="addStore()">+ Add store</button>
-    </div>
-  </section>
-
-  <!-- MEALS SECTION -->
-  <section id="section-meals" class="tab-content">
-    <div class="meal-table-wrap">
-      <table>
-        <thead><tr><th>Date</th><th>Breakfast</th><th>Lunch</th><th>Dinner</th></tr></thead>
-        <tbody id="meal-table-body"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- SIVA'S WORKOUTS SECTION -->
-  <section id="section-workout" class="tab-content">
-    <h2 class="section-title">Siva's Workouts</h2>
-
-    <!-- Full-Dataset Historical Stats Grid -->
-    <div class="workout-stats-grid">
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-week">0/7</span>
-        <span class="workout-stat-lbl">This Week</span>
-      </div>
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-month">0/30</span>
-        <span class="workout-stat-lbl" id="stat-month-lbl">This Month</span>
-      </div>
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-quarter">0/91</span>
-        <span class="workout-stat-lbl">This Quarter</span>
-      </div>
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-year">0/365</span>
-        <span class="workout-stat-lbl">This Year</span>
-      </div>
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-miles">0.0</span>
-        <span class="workout-stat-lbl">Miles Logged</span>
-      </div>
-      <div class="workout-stat-card">
-        <span class="workout-stat-val" id="stat-toplift">—</span>
-        <span class="workout-stat-lbl">Top Lift</span>
-      </div>
-    </div>
-
-    <!-- Monthly Calendar View -->
-    <div class="workout-card calendar-card">
-      <div class="calendar-header">
-        <button type="button" class="cal-nav-btn" onclick="changeMonth(-1)">◀ Prev</button>
-        <h3 id="calendar-month-title">Current Month</h3>
-        <button type="button" class="cal-nav-btn" onclick="changeMonth(1)">Next ▶</button>
-      </div>
-      <div class="calendar-grid-wrap">
-        <div class="calendar-weekdays">
-          <span class="is-weekend">Su</span>
-          <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span>
-          <span class="is-weekend">Sa</span>
+        <!-- SUB-NAVIGATION BAR FOR MAIN -->
+        <div class="subnav-bar">
+          <button type="button" class="subtab-btn active" id="subtab-tasks" onclick="switchMainSubTab('tasks')">📋 Tasks</button>
+          <button type="button" class="subtab-btn" id="subtab-meals" onclick="switchMainSubTab('meals')">🍽️ Meals</button>
+          <button type="button" class="subtab-btn" id="subtab-shopping" onclick="switchMainSubTab('shopping')">🛒 Shopping</button>
         </div>
-        <div class="calendar-days" id="calendar-days-grid"></div>
-      </div>
-      <div class="calendar-legend">
-        <div class="legend-item"><span class="legend-swatch swatch-running"></span> Running</div>
-        <div class="legend-item"><span class="legend-swatch swatch-strength"></span> Strength</div>
-        <div class="legend-item"><span class="legend-swatch swatch-rest"></span> Rest</div>
-      </div>
-    </div>
 
-    <!-- Active Selected Date Card for Logging -->
-    <div id="workout-active-day-container"></div>
-  </section>
-</div>
+        <!-- SUB-SECTION: TASKS -->
+        <div id="subcontent-tasks" class="subcontent-panel active">
+          <!-- MASTER TASK FILTER -->
+          <div class="filter-bar">
+            <span>Filter by:</span>
+            <button type="button" class="filter-btn active" id="filter-all" onclick="setTaskFilter('all')">All</button>
+            <button type="button" class="filter-btn filter-siva" id="filter-siva" onclick="setTaskFilter('Siva')">Siva</button>
+            <button type="button" class="filter-btn filter-priya" id="filter-priya" onclick="setTaskFilter('Priya')">Priya</button>
+            <button type="button" class="filter-btn" id="filter-none" onclick="setTaskFilter('none')">Unassigned</button>
+          </div>
 
-<script type="module" src="app.js"></script>
+          <!-- QUICK TEMPLATE PICKER -->
+          <div class="template-picker">
+            <div class="template-header">
+              <span class="template-title">⚡ Quick Add Templates</span>
+            </div>
+            <div id="template-pills" class="template-pills"></div>
+          </div>
+
+          <!-- TASK COLUMNS -->
+          <div class="task-cols">
+            <div class="task-col" data-column="today">
+              <h3>Today <small id="count-today">0</small></h3>
+              <ul id="list-today" class="task-list"></ul>
+            </div>
+            <div class="task-col" data-column="week">
+              <h3>This Week <small id="count-week">0</small></h3>
+              <ul id="list-week" class="task-list"></ul>
+            </div>
+            <div class="task-col" data-column="someday">
+              <h3>Someday <small id="count-someday">0</small></h3>
+              <ul id="list-someday" class="task-list"></ul>
+            </div>
+          </div>
+
+          <!-- ADD TASK ROW -->
+          <div class="add-row">
+            <input type="text" id="task-input" placeholder="Add a task..." onkeydown="if(event.key==='Enter') addTask()">
+            <select id="task-column">
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="someday">Someday</option>
+            </select>
+            <select id="task-assignee">
+              <option value="">Unassigned</option>
+              <option value="Siva">Siva</option>
+              <option value="Priya">Priya</option>
+            </select>
+            <button type="button" onclick="addTask()">Add Task</button>
+          </div>
+
+          <!-- ARCHIVE CONTAINER -->
+          <div class="archive-wrap">
+            <div class="archive-header" onclick="toggleArchiveVisibility()">
+              <h3>📦 Completed Archive (<span id="count-archive">0</span>)</h3>
+              <button type="button" id="archive-toggle-btn" class="archive-toggle-btn">▼ Hide</button>
+            </div>
+            <div id="archive-content" class="archive-content">
+              <div id="archive-list-container"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-SECTION: MEALS -->
+        <div id="subcontent-meals" class="subcontent-panel">
+          <div class="meal-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Breakfast</th>
+                  <th>Lunch</th>
+                  <th>Dinner</th>
+                </tr>
+              </thead>
+              <tbody id="meal-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-SECTION: SHOPPING -->
+        <div id="subcontent-shopping" class="subcontent-panel">
+          <div id="shopping-grid" class="shop-grid"></div>
+          <div class="add-store-row">
+            <input type="text" id="new-store-input" placeholder="Add new store category..." onkeydown="if(event.key==='Enter') addStore()">
+            <button type="button" onclick="addStore()">+ Add Store</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- WORKOUTS SECTION -->
+      <section id="section-workouts" class="view-section">
+        <header class="section-header">
+          <h1>Siva's Workout Engine</h1>
+        </header>
+
+        <!-- STATS DASHBOARD -->
+        <div class="workout-stats-grid">
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-week">0/7</span>
+            <span class="workout-stat-lbl">This Week</span>
+          </div>
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-month">0/30</span>
+            <span class="workout-stat-lbl" id="stat-month-lbl">This Month</span>
+          </div>
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-quarter">0/90</span>
+            <span class="workout-stat-lbl">Quarter</span>
+          </div>
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-year">0/365</span>
+            <span class="workout-stat-lbl">Year</span>
+          </div>
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-miles">0.0</span>
+            <span class="workout-stat-lbl">Total Miles</span>
+          </div>
+          <div class="workout-stat-card">
+            <span class="workout-stat-val" id="stat-toplift">—</span>
+            <span class="workout-stat-lbl">Top Lift</span>
+          </div>
+        </div>
+
+        <!-- MONTHLY CALENDAR GRID -->
+        <div class="workout-card calendar-card">
+          <div class="calendar-header">
+            <button type="button" class="cal-nav-btn" onclick="changeMonth(-1)">◄ Prev</button>
+            <h3 id="calendar-month-title">Month Year</h3>
+            <button type="button" class="cal-nav-btn" onclick="changeMonth(1)">Next ►</button>
+          </div>
+          <div class="calendar-grid-wrap">
+            <div class="calendar-weekdays">
+              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="is-weekend">Sat</span>
+            </div>
+            <div id="calendar-days-grid" class="calendar-days"></div>
+          </div>
+          <div class="calendar-legend">
+            <span class="legend-item"><span class="legend-swatch swatch-running"></span> Running</span>
+            <span class="legend-item"><span class="legend-swatch swatch-strength"></span> Strength</span>
+            <span class="legend-item"><span class="legend-swatch swatch-rest"></span> Rest</span>
+          </div>
+        </div>
+
+        <!-- ACTIVE DAY WORKOUT CARD -->
+        <div id="workout-active-day-container"></div>
+      </section>
+
+      <!-- EVENTS SECTION -->
+      <section id="section-events" class="view-section">
+        <header class="section-header">
+          <h1>Family Events & Schedule</h1>
+        </header>
+
+        <!-- ADD EVENT FORM -->
+        <div class="event-form-card">
+          <h3>+ Add New Event</h3>
+          <div class="event-form-grid">
+            <div class="event-form-group flex-2">
+              <label>Description</label>
+              <input type="text" id="event-desc-input" placeholder="e.g. Lassya's pediatrician appointment" onkeydown="if(event.key==='Enter') addEvent()">
+            </div>
+            <div class="event-form-group">
+              <label>Date</label>
+              <input type="date" id="event-date-input">
+            </div>
+            <div class="event-form-group">
+              <label>Time Block</label>
+              <select id="event-timeblock-input">
+                <option value="Morning">🌅 Morning</option>
+                <option value="Afternoon">☀️ Afternoon</option>
+                <option value="Evening">🌙 Evening</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" class="add-event-btn" onclick="addEvent()">Save Event</button>
+        </div>
+
+        <!-- EVENTS MONTHLY CALENDAR -->
+        <div class="workout-card calendar-card">
+          <div class="calendar-header">
+            <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(-1)">◄ Prev</button>
+            <h3 id="events-calendar-month-title">Month Year</h3>
+            <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(1)">Next ►</button>
+          </div>
+          <div class="calendar-grid-wrap">
+            <div class="calendar-weekdays">
+              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="is-weekend">Sat</span>
+            </div>
+            <div id="events-calendar-days-grid" class="calendar-days"></div>
+          </div>
+        </div>
+
+        <!-- ROLLING 7-DAY EVENT AGENDA -->
+        <div class="events-agenda-card">
+          <h3>📅 Rolling 7-Day Agenda</h3>
+          <div id="events-agenda-container" class="events-agenda-list"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>

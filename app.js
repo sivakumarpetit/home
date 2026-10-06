@@ -47,15 +47,19 @@ let state = {
   storeOrder: ['Grocery','Costco','Indian','Amazon','Walmart'],
   shopping: { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
   meals: {},
-  workouts: {}
+  workouts: {},
+  events: []
 };
 const mealTypes = ['breakfast','lunch','dinner'];
 let currentTaskFilter = 'all';
 
-// WORKOUT CALENDAR NAV & SELECTION STATE
+// CALENDAR & ROUTING STATES
 let viewYear = new Date().getFullYear();
-let viewMonth = new Date().getMonth(); // 0-indexed
-let activeSelectedIsoDate = getIsoDateKey(0); // Default to today
+let viewMonth = new Date().getMonth();
+let activeSelectedIsoDate = getIsoDateKey(0);
+
+let eventsViewYear = new Date().getFullYear();
+let eventsViewMonth = new Date().getMonth();
 
 let saveTimer = null;
 let remoteVersion = null;
@@ -134,13 +138,21 @@ function sanitizeData(data){
     });
   }
 
+  const cleanEvents = Array.isArray(data.events) ? data.events.map(e => ({
+    id: e.id || (Date.now() + Math.random()),
+    description: e.description || '',
+    date: e.date || getIsoDateKey(0),
+    timeBlock: e.timeBlock || 'Morning'
+  })) : [];
+
   return {
     tasks: cleanTasks,
     templates: Array.isArray(data.templates) && data.templates.length ? data.templates : [...DEFAULT_TEMPLATES],
     storeOrder: Array.isArray(data.storeOrder) && data.storeOrder.length ? data.storeOrder : ['Grocery','Costco','Indian','Amazon','Walmart'],
     shopping: data.shopping || { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
     meals: data.meals || {},
-    workouts: cleanWorkouts
+    workouts: cleanWorkouts,
+    events: cleanEvents
   };
 }
 
@@ -199,11 +211,21 @@ async function saveToFirestore(){
   }
 }
 
-function switchTab(tabId){
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.getElementById('section-'+tabId).classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('tab-'+tabId).classList.add('active');
+// --- NAVIGATION ROUTING ---
+function switchSidebarTab(tabId){
+  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+  document.getElementById('section-' + tabId).classList.add('active');
+
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('nav-' + tabId).classList.add('active');
+}
+
+function switchMainSubTab(subId){
+  document.querySelectorAll('.subcontent-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('subcontent-' + subId).classList.add('active');
+
+  document.querySelectorAll('.subtab-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('subtab-' + subId).classList.add('active');
 }
 
 function getIsoDateKey(offsetDays = 0){
@@ -954,243 +976,9 @@ function renderWorkoutCalendar(){
     cell.innerText = day;
     cell.onclick = () => selectCalendarDate(dateKey);
 
-    if(w.type === 'running'){
-      const mi = w.mileage ? `${w.mileage} mi` : 'Run';
-      cell.title = `${formatDateLabel(dateKey)}: ${w.runType || 'Run'} (${mi})`;
-    } else if(w.type === 'strength'){
-      cell.title = `${formatDateLabel(dateKey)}: ${w.exercise || 'Strength'} (Week ${w.week || 1})`;
-    } else if(w.type === 'rest'){
-      cell.title = `${formatDateLabel(dateKey)}: Rest Day`;
-    } else {
-      cell.title = formatDateLabel(dateKey);
-    }
-
     gridEl.appendChild(cell);
   }
 }
 
 function renderDayCard(dateKey){
-  const w = getWorkout(dateKey);
-  const todayIso = getIsoDateKey(0);
-  const isToday = dateKey === todayIso;
-
-  const card = document.createElement('div');
-  card.className = `day-card ${isToday ? 'card-today' : ''}`;
-
-  const dateLabelText = isToday ? `Today (${formatDateLabel(dateKey)})` : formatDateLabel(dateKey);
-  const todayBadgeHtml = isToday ? `<span class="today-badge">Today</span>` : '';
-
-  let contentHtml = '';
-  if(w.type === 'running'){
-    const milesVal = typeof w.mileage === 'number' ? w.mileage : '';
-    contentHtml = `
-      <div class="workout-input-panel">
-        <div class="running-input-grid">
-          <select onchange="setRunParam('${dateKey}', 'runType', this.value)">
-            <option value="Easy" ${w.runType === 'Easy' ? 'selected' : ''}>Easy</option>
-            <option value="Tempo" ${w.runType === 'Tempo' ? 'selected' : ''}>Tempo</option>
-            <option value="Long" ${w.runType === 'Long' ? 'selected' : ''}>Long</option>
-          </select>
-          <input type="number" step="0.1" min="0" placeholder="Distance (Miles)" value="${milesVal}"
-            oninput="setRunParam('${dateKey}', 'mileage', this.value)">
-        </div>
-      </div>
-    `;
-  } else if(w.type === 'strength'){
-    const percentageMap = { 1: [0.65, 0.75, 0.85], 2: [0.70, 0.80, 0.90], 3: [0.75, 0.85, 0.95], 4: [0.40, 0.50, 0.60] };
-    const targetRepsMap = { 1: ["5", "5", "5+"], 2: ["3", "3", "3+"], 3: ["5", "3", "1+"], 4: ["5", "5", "5"] };
-
-    const tm = w.trainingMax;
-    let setsHtml = '';
-
-    if(tm && tm > 0){
-      const currPercentages = percentageMap[w.week || 1];
-      const currReps = targetRepsMap[w.week || 1];
-
-      const warmUpWeight = roundToNearest5(tm * 0.50);
-      const main1Weight = roundToNearest5(tm * currPercentages[0]);
-      const main2Weight = roundToNearest5(tm * currPercentages[1]);
-      const main3Weight = roundToNearest5(tm * currPercentages[2]);
-      const bbbWeight = warmUpWeight;
-
-      const setsLog = w.setsLog || [];
-
-      // Warm-up Sets (3 individual checkable sets @ 50% TM x 5 reps)
-      setsHtml += `<div class="set-section-header">Warm-Up</div>`;
-      setsHtml += renderPlateVisualizer(warmUpWeight);
-      for(let i = 1; i <= 3; i++){
-        const logIdx = i - 1; // 0, 1, 2
-        setsHtml += `
-          <div class="set-row">
-            <div class="set-info">
-              <span class="set-title">Warm-up Set ${i}</span>
-              <span class="set-detail">50% TM (${warmUpWeight} lbs) × 5 reps</span>
-            </div>
-            <div class="set-action">
-              <input type="checkbox" ${setsLog[logIdx] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', ${logIdx}, this.checked)">
-            </div>
-          </div>
-        `;
-      }
-
-      // Main Sets
-      setsHtml += `<div class="set-section-header">Main Sets (5/3/1)</div>`;
-      setsHtml += renderPlateVisualizer(main1Weight);
-      setsHtml += `
-        <div class="set-row">
-          <div class="set-info">
-            <span class="set-title">Main Set 1</span>
-            <span class="set-detail">${Math.round(currPercentages[0]*100)}% TM (${main1Weight} lbs) × ${currReps[0]} reps</span>
-          </div>
-          <div class="set-action">
-            <input type="checkbox" ${setsLog[3] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 3, this.checked)">
-          </div>
-        </div>
-      `;
-
-      if (main2Weight !== main1Weight) setsHtml += renderPlateVisualizer(main2Weight);
-      setsHtml += `
-        <div class="set-row">
-          <div class="set-info">
-            <span class="set-title">Main Set 2</span>
-            <span class="set-detail">${Math.round(currPercentages[1]*100)}% TM (${main2Weight} lbs) × ${currReps[1]} reps</span>
-          </div>
-          <div class="set-action">
-            <input type="checkbox" ${setsLog[4] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 4, this.checked)">
-          </div>
-        </div>
-      `;
-
-      if (main3Weight !== main2Weight) setsHtml += renderPlateVisualizer(main3Weight);
-      setsHtml += `
-        <div class="set-row">
-          <div class="set-info">
-            <span class="set-title">Main Set 3 (AMRAP)</span>
-            <span class="set-detail">${Math.round(currPercentages[2]*100)}% TM (${main3Weight} lbs) × ${currReps[2]} reps</span>
-          </div>
-          <div class="set-action">
-            <input type="number" class="reps-input" placeholder="Reps" min="0" value="${w.amrapReps || ''}" oninput="setAmrapReps('${dateKey}', this.value)">
-            <input type="checkbox" ${setsLog[5] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', 5, this.checked)">
-          </div>
-        </div>
-      `;
-
-      // BBB Supplemental Sets
-      setsHtml += `<div class="set-section-header">BBB Supplemental (5x${w.bbbReps || '10'} @ 50%)</div>`;
-      if (bbbWeight !== main3Weight) setsHtml += renderPlateVisualizer(bbbWeight);
-
-      for(let i = 1; i <= 5; i++){
-        const logIdx = 5 + i; // 6, 7, 8, 9, 10
-        setsHtml += `
-          <div class="set-row">
-            <div class="set-info">
-              <span class="set-title">BBB Set ${i}</span>
-              <span class="set-detail">50% TM (${bbbWeight} lbs) × ${w.bbbReps || '10'} reps</span>
-            </div>
-            <div class="set-action">
-              <input type="checkbox" ${setsLog[logIdx] ? 'checked' : ''} onchange="setWorkoutSetToggle('${dateKey}', ${logIdx}, this.checked)">
-            </div>
-          </div>
-        `;
-      }
-    }
-
-    contentHtml = `
-      <div class="workout-input-panel">
-        <div class="bbb-form-grid">
-          <div class="bbb-form-group">
-            <label>Exercise</label>
-            <select id="ex-${dateKey}">
-              ${LIFT_OPTIONS.map(l => `<option value="${l}" ${w.exercise === l ? 'selected' : ''}>${l}</option>`).join('')}
-            </select>
-          </div>
-          <div class="bbb-form-group">
-            <label>Training Max (lbs)</label>
-            <input type="number" id="tm-${dateKey}" placeholder="e.g. 200" value="${w.trainingMax || ''}">
-          </div>
-          <div class="bbb-form-group">
-            <label>BBB Reps</label>
-            <select id="bbb-${dateKey}">
-              <option value="5" ${w.bbbReps === '5' ? 'selected' : ''}>5 Reps</option>
-              <option value="7" ${w.bbbReps === '7' ? 'selected' : ''}>7 Reps</option>
-              <option value="10" ${w.bbbReps === '10' || !w.bbbReps ? 'selected' : ''}>10 Reps</option>
-            </select>
-          </div>
-          <div class="bbb-form-group">
-            <label>Week Cycle</label>
-            <select id="week-${dateKey}">
-              <option value="1" ${w.week == 1 ? 'selected' : ''}>Week 1 (65/75/85%+)</option>
-              <option value="2" ${w.week == 2 ? 'selected' : ''}>Week 2 (70/80/90%+)</option>
-              <option value="3" ${w.week == 3 ? 'selected' : ''}>Week 3 (75/85/95%+)</option>
-              <option value="4" ${w.week == 4 ? 'selected' : ''}>Week 4 Deload</option>
-            </select>
-          </div>
-        </div>
-        <button type="button" class="gen-btn" onclick="generate531Program('${dateKey}')">⚡ Generate 5/3/1 Workout</button>
-        <div id="sets-container-${dateKey}">${setsHtml}</div>
-      </div>
-    `;
-  } else if(w.type === 'rest'){
-    contentHtml = `
-      <div class="workout-input-panel">
-        <div class="rest-note">😴 Resting on this day.</div>
-      </div>
-    `;
-  }
-
-  card.innerHTML = `
-    <div class="day-card-head">
-      <div class="day-card-date">
-        📅 ${dateLabelText} ${todayBadgeHtml}
-      </div>
-    </div>
-    <div class="segmented-picker">
-      <button type="button" class="seg-btn seg-running ${w.type === 'running' ? 'active' : ''}"
-        onclick="setWorkoutType('${dateKey}', 'running')">🏃 Run</button>
-      <button type="button" class="seg-btn seg-strength ${w.type === 'strength' ? 'active' : ''}"
-        onclick="setWorkoutType('${dateKey}', 'strength')">🏋️ Strength</button>
-      <button type="button" class="seg-btn seg-rest ${w.type === 'rest' ? 'active' : ''}"
-        onclick="setWorkoutType('${dateKey}', 'rest')">😴 Rest</button>
-    </div>
-    ${contentHtml}
-  `;
-
-  return card;
-}
-
-function renderWorkouts(){
-  renderWorkoutStats();
-  renderWorkoutCalendar();
-
-  const activeContainer = document.getElementById('workout-active-day-container');
-  if(activeContainer){
-    activeContainer.innerHTML = '';
-    activeContainer.appendChild(renderDayCard(activeSelectedIsoDate));
-  }
-}
-
-function escapeHtml(str){
-  const div = document.createElement('div');
-  div.innerText = str;
-  return div.innerHTML;
-}
-
-function renderAll(){
-  renderTasks();
-  renderShopping();
-  renderMeals();
-  renderTemplates();
-  renderWorkouts();
-  initArchiveVisibility();
-}
-
-checkPinAuth();
-
-Object.assign(window, {
-  switchTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask, cycleAssignee,
-  promptAddTemplate, removeTemplate,
-  addStore, removeStore, renameStore,
-  addShoppingItem, toggleShoppingItem, clearCheckedShopping,
-  updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard,
-  setWorkoutType, setRunParam, generate531Program, setWorkoutSetToggle, setAmrapReps, selectCalendarDate, changeMonth
-});
+  const w
