@@ -211,16 +211,26 @@ async function saveToFirestore(){
   }
 }
 
-// --- NAVIGATION ROUTING ---
+// --- SIDEBAR TOGGLE & ROUTING ---
+function toggleSidebar(){
+  const layout = document.getElementById('app-layout');
+  layout.classList.toggle('sidebar-collapsed');
+}
+
 function switchSidebarTab(tabId){
   document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
   document.getElementById('section-' + tabId).classList.add('active');
 
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('nav-' + tabId).classList.add('active');
+
+  // Auto-close sidebar on mobile after choosing an option
+  if(window.innerWidth <= 768){
+    document.getElementById('app-layout').classList.add('sidebar-collapsed');
+  }
 }
 
-function switchMainSubTab(subId){
+function switchHQSubTab(subId){
   document.querySelectorAll('.subcontent-panel').forEach(el => el.classList.remove('active'));
   document.getElementById('subcontent-' + subId).classList.add('active');
 
@@ -1026,7 +1036,7 @@ function renderDayCard(dateKey){
 
       const setsLog = w.setsLog || [];
 
-      // Warm-up Sets (3 individual checkable sets @ 50% TM x 5 reps)
+      // Warm-up Sets
       setsHtml += `<div class="set-section-header">Warm-Up</div>`;
       setsHtml += renderPlateVisualizer(warmUpWeight);
       for(let i = 1; i <= 3; i++){
@@ -1329,7 +1339,6 @@ function renderAll(){
   renderEvents();
   initArchiveVisibility();
 
-  // Set default date for event input to today
   const dateInput = document.getElementById('event-date-input');
   if(dateInput && !dateInput.value) dateInput.value = getIsoDateKey(0);
 }
@@ -1337,7 +1346,7 @@ function renderAll(){
 checkPinAuth();
 
 Object.assign(window, {
-  switchSidebarTab, switchMainSubTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask, cycleAssignee,
+  toggleSidebar, switchSidebarTab, switchHQSubTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask, cycleAssignee,
   promptAddTemplate, removeTemplate,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,

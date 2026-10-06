@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Family Dashboard</title>
+  <title>Family HQ</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#faf7f2">
@@ -14,34 +14,31 @@
   <!-- SECURITY PIN OVERLAY -->
   <div id="pin-overlay" class="pin-overlay">
     <div class="pin-card">
-      <h2>Family Dashboard</h2>
+      <h2>Family HQ</h2>
       <p>Enter PIN to access your family hub</p>
       <div class="pin-input-group">
-        <input type="password" id="pin-input" id="pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyPin()">
+        <input type="password" id="pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyPin()">
         <button type="button" onclick="verifyPin()">Unlock</button>
       </div>
       <p id="pin-error" class="pin-error"></p>
     </div>
   </div>
 
-  <!-- APP SHELL / SIDEBAR CONTAINER -->
-  <div class="app-layout">
+  <!-- APP SHELL / LAYOUT -->
+  <div class="app-layout" id="app-layout">
     
-    <!-- SIDEBAR NAVIGATION -->
-    <aside class="sidebar">
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <h2>Family Hub</h2>
+        <h2>Family HQ</h2>
         <span id="sync-status">connecting…</span>
       </div>
       <nav class="sidebar-nav">
-        <button type="button" class="nav-btn active" id="nav-main" onclick="switchSidebarTab('main')">
-          <span class="nav-icon">🏠</span> Main
+        <button type="button" class="nav-btn active" id="nav-hq" onclick="switchSidebarTab('hq')">
+          <span class="nav-icon">🏠</span> Family HQ
         </button>
         <button type="button" class="nav-btn" id="nav-workouts" onclick="switchSidebarTab('workouts')">
           <span class="nav-icon">🏋️</span> Workouts
-        </button>
-        <button type="button" class="nav-btn" id="nav-events" onclick="switchSidebarTab('events')">
-          <span class="nav-icon">📅</span> Events
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -49,25 +46,32 @@
       </div>
     </aside>
 
-    <!-- MAIN CONTENT AREA -->
+    <!-- MAIN CONTENT VIEWPORT -->
     <main class="main-viewport">
 
-      <!-- MAIN TAB SECTION (TASKS, MEALS, SHOPPING) -->
-      <section id="section-main" class="view-section active">
+      <!-- TOP BAR WITH SIDEBAR TOGGLE BUTTON -->
+      <div class="top-bar">
+        <button type="button" class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar Menu">
+          ☰ Menu
+        </button>
+      </div>
+
+      <!-- FAMILY HQ SECTION -->
+      <section id="section-hq" class="view-section active">
         <header class="section-header">
-          <h1>Main Workspace</h1>
+          <h1>Family HQ</h1>
         </header>
 
-        <!-- SUB-NAVIGATION BAR FOR MAIN -->
+        <!-- SUB-NAVIGATION BAR -->
         <div class="subnav-bar">
-          <button type="button" class="subtab-btn active" id="subtab-tasks" onclick="switchMainSubTab('tasks')">📋 Tasks</button>
-          <button type="button" class="subtab-btn" id="subtab-meals" onclick="switchMainSubTab('meals')">🍽️ Meals</button>
-          <button type="button" class="subtab-btn" id="subtab-shopping" onclick="switchMainSubTab('shopping')">🛒 Shopping</button>
+          <button type="button" class="subtab-btn active" id="subtab-tasks" onclick="switchHQSubTab('tasks')">📋 Tasks</button>
+          <button type="button" class="subtab-btn" id="subtab-events" onclick="switchHQSubTab('events')">📅 Events</button>
+          <button type="button" class="subtab-btn" id="subtab-meals" onclick="switchHQSubTab('meals')">🍽️ Meals</button>
+          <button type="button" class="subtab-btn" id="subtab-shopping" onclick="switchHQSubTab('shopping')">🛒 Shopping</button>
         </div>
 
         <!-- SUB-SECTION: TASKS -->
         <div id="subcontent-tasks" class="subcontent-panel active">
-          <!-- MASTER TASK FILTER -->
           <div class="filter-bar">
             <span>Filter by:</span>
             <button type="button" class="filter-btn active" id="filter-all" onclick="setTaskFilter('all')">All</button>
@@ -76,7 +80,6 @@
             <button type="button" class="filter-btn" id="filter-none" onclick="setTaskFilter('none')">Unassigned</button>
           </div>
 
-          <!-- QUICK TEMPLATE PICKER -->
           <div class="template-picker">
             <div class="template-header">
               <span class="template-title">⚡ Quick Add Templates</span>
@@ -84,7 +87,6 @@
             <div id="template-pills" class="template-pills"></div>
           </div>
 
-          <!-- TASK COLUMNS -->
           <div class="task-cols">
             <div class="task-col" data-column="today">
               <h3>Today <small id="count-today">0</small></h3>
@@ -100,7 +102,6 @@
             </div>
           </div>
 
-          <!-- ADD TASK ROW -->
           <div class="add-row">
             <input type="text" id="task-input" placeholder="Add a task..." onkeydown="if(event.key==='Enter') addTask()">
             <select id="task-column">
@@ -116,7 +117,6 @@
             <button type="button" onclick="addTask()">Add Task</button>
           </div>
 
-          <!-- ARCHIVE CONTAINER -->
           <div class="archive-wrap">
             <div class="archive-header" onclick="toggleArchiveVisibility()">
               <h3>📦 Completed Archive (<span id="count-archive">0</span>)</h3>
@@ -125,6 +125,51 @@
             <div id="archive-content" class="archive-content">
               <div id="archive-list-container"></div>
             </div>
+          </div>
+        </div>
+
+        <!-- SUB-SECTION: EVENTS -->
+        <div id="subcontent-events" class="subcontent-panel">
+          <div class="event-form-card">
+            <h3>+ Add New Event</h3>
+            <div class="event-form-grid">
+              <div class="event-form-group flex-2">
+                <label>Description</label>
+                <input type="text" id="event-desc-input" placeholder="e.g. Laasya's pediatrician appointment" onkeydown="if(event.key==='Enter') addEvent()">
+              </div>
+              <div class="event-form-group">
+                <label>Date</label>
+                <input type="date" id="event-date-input">
+              </div>
+              <div class="event-form-group">
+                <label>Time Block</label>
+                <select id="event-timeblock-input">
+                  <option value="Morning">🌅 Morning</option>
+                  <option value="Afternoon">☀️️ Afternoon</option>
+                  <option value="Evening">🌙 Evening</option>
+                </select>
+              </div>
+            </div>
+            <button type="button" class="add-event-btn" onclick="addEvent()">Save Event</button>
+          </div>
+
+          <div class="workout-card calendar-card">
+            <div class="calendar-header">
+              <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(-1)">◄ Prev</button>
+              <h3 id="events-calendar-month-title">Month Year</h3>
+              <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(1)">Next ►</button>
+            </div>
+            <div class="calendar-grid-wrap">
+              <div class="calendar-weekdays">
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="is-weekend">Sat</span>
+              </div>
+              <div id="events-calendar-days-grid" class="calendar-days"></div>
+            </div>
+          </div>
+
+          <div class="events-agenda-card">
+            <h3>📅 Rolling 7-Day Agenda</h3>
+            <div id="events-agenda-container" class="events-agenda-list"></div>
           </div>
         </div>
 
@@ -161,7 +206,6 @@
           <h1>Siva's Workout Engine</h1>
         </header>
 
-        <!-- STATS DASHBOARD -->
         <div class="workout-stats-grid">
           <div class="workout-stat-card">
             <span class="workout-stat-val" id="stat-week">0/7</span>
@@ -189,7 +233,6 @@
           </div>
         </div>
 
-        <!-- MONTHLY CALENDAR GRID -->
         <div class="workout-card calendar-card">
           <div class="calendar-header">
             <button type="button" class="cal-nav-btn" onclick="changeMonth(-1)">◄ Prev</button>
@@ -209,60 +252,7 @@
           </div>
         </div>
 
-        <!-- ACTIVE DAY WORKOUT CARD -->
         <div id="workout-active-day-container"></div>
-      </section>
-
-      <!-- EVENTS SECTION -->
-      <section id="section-events" class="view-section">
-        <header class="section-header">
-          <h1>Family Events & Schedule</h1>
-        </header>
-
-        <!-- ADD EVENT FORM -->
-        <div class="event-form-card">
-          <h3>+ Add New Event</h3>
-          <div class="event-form-grid">
-            <div class="event-form-group flex-2">
-              <label>Description</label>
-              <input type="text" id="event-desc-input" placeholder="e.g. Lassya's pediatrician appointment" onkeydown="if(event.key==='Enter') addEvent()">
-            </div>
-            <div class="event-form-group">
-              <label>Date</label>
-              <input type="date" id="event-date-input">
-            </div>
-            <div class="event-form-group">
-              <label>Time Block</label>
-              <select id="event-timeblock-input">
-                <option value="Morning">🌅 Morning</option>
-                <option value="Afternoon">☀️ Afternoon</option>
-                <option value="Evening">🌙 Evening</option>
-              </select>
-            </div>
-          </div>
-          <button type="button" class="add-event-btn" onclick="addEvent()">Save Event</button>
-        </div>
-
-        <!-- EVENTS MONTHLY CALENDAR -->
-        <div class="workout-card calendar-card">
-          <div class="calendar-header">
-            <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(-1)">◄ Prev</button>
-            <h3 id="events-calendar-month-title">Month Year</h3>
-            <button type="button" class="cal-nav-btn" onclick="changeEventsMonth(1)">Next ►</button>
-          </div>
-          <div class="calendar-grid-wrap">
-            <div class="calendar-weekdays">
-              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="is-weekend">Sat</span>
-            </div>
-            <div id="events-calendar-days-grid" class="calendar-days"></div>
-          </div>
-        </div>
-
-        <!-- ROLLING 7-DAY EVENT AGENDA -->
-        <div class="events-agenda-card">
-          <h3>📅 Rolling 7-Day Agenda</h3>
-          <div id="events-agenda-container" class="events-agenda-list"></div>
-        </div>
       </section>
 
     </main>
