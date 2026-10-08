@@ -1,4 +1,4 @@
-const CACHE_NAME = 'family-dashboard-v3'; // Incremented to force cache refresh
+const CACHE_NAME = 'family-dashboard-v4'; // Incremented to force cache refresh
 const ASSETS = [
   './',
   'index.html',
