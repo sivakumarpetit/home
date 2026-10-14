@@ -1,11 +1,11 @@
-const CACHE_NAME = 'family-dashboard-v4'; // Incremented to force cache refresh
+const CACHE_NAME = 'family-dashboard-v5'; // Incremented to force cache refresh
 const ASSETS = [
   './',
   'index.html',
   'styles.css',
   'app.js',
   'manifest.json',
-  'icon.png'
+  'icon.jpg'
 ];
 
 self.addEventListener('install', (event) => {

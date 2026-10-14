@@ -3,7 +3,8 @@ import {
   getFirestore, doc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut
+  getAuth, GoogleAuthProvider, getRedirectResult, onAuthStateChanged,
+  signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -75,10 +76,17 @@ async function signInWithGoogle(){
   errorEl.innerText = '';
   button.disabled = true;
   try{
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    if(isMobile){
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
     await signInWithPopup(auth, googleProvider);
   } catch(err){
     console.error(err);
-    errorEl.innerText = 'Sign-in failed. Check Google provider and authorized domain settings, then try again.';
+    errorEl.innerText = `Sign-in failed (${err.code || 'unknown error'}). Check Google provider and authorized domain settings, then try again.`;
   } finally {
     button.disabled = false;
   }
@@ -193,6 +201,12 @@ onAuthStateChanged(auth, (user)=>{
   }
   overlay.style.display = 'none';
   loadState();
+});
+
+getRedirectResult(auth).catch(err=>{
+  console.error(err);
+  document.getElementById('auth-error').innerText =
+    `Sign-in failed (${err.code || 'unknown error'}). Check Firebase Authentication settings, then try again.`;
 });
 
 document.addEventListener('focusout', ()=>{
