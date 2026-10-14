@@ -4,6 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, GoogleAuthProvider, getRedirectResult, onAuthStateChanged,
+  reauthenticateWithPopup, reauthenticateWithRedirect,
   signInWithPopup, signInWithRedirect, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -19,6 +20,7 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
 const stateRef = doc(db, "family-dashboard", "shared-state");
 
 const DEFAULT_TEMPLATES = [
@@ -26,6 +28,13 @@ const DEFAULT_TEMPLATES = [
   "🧽 Clean Kitchen", "🪴 Water Plants", "🍽️ Dishwasher", 
   "📦 Mail/Packages", "🧹 Vacuum", "🌿 Lawn Care"
 ];
+
+const DEFAULT_STORAGE_TOTES = Array.from({ length: 20 }, (_, index) => ({
+  id: index + 1,
+  name: `Tote ${String(index + 1).padStart(2, '0')}`,
+  contents: '',
+  photoIds: []
+}));
 
 const LIFT_OPTIONS = ["Bench Press", "Squat", "Deadlift", "Overhead Press"];
 
@@ -52,7 +61,8 @@ let state = {
   shopping: { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
   meals: {},
   workouts: {},
-  events: []
+  events: [],
+  storageTotes: DEFAULT_STORAGE_TOTES.map(tote => ({ ...tote, photoIds: [...tote.photoIds] }))
 };
 const mealTypes = ['breakfast','lunch','dinner'];
 let currentTaskFilter = 'all';
@@ -69,6 +79,38 @@ let saveTimer = null;
 let remoteVersion = null;
 let pendingRemoteData = null;
 let unsubscribeRemoteState = null;
+let driveAccessToken = null;
+let driveTokenUserId = null;
+let driveTokenExpiresAt = 0;
+const drivePhotoUrls = new Map();
+const drivePhotoRequests = new Map();
+
+function isMobileAuthFlow(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function revokeDrivePhotoUrls(){
+  drivePhotoUrls.forEach(url => URL.revokeObjectURL(url));
+  drivePhotoUrls.clear();
+  drivePhotoRequests.clear();
+}
+
+function rememberDriveCredential(result){
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  if(!credential?.accessToken || !auth.currentUser) return false;
+
+  driveAccessToken = credential.accessToken;
+  driveTokenUserId = auth.currentUser.uid;
+  driveTokenExpiresAt = Date.now() + 55 * 60 * 1000;
+  renderStorage();
+  return true;
+}
+
+function hasDriveAccess(){
+  return Boolean(driveAccessToken && driveTokenUserId === auth.currentUser?.uid && Date.now() < driveTokenExpiresAt);
+}
 
 async function signInWithGoogle(){
   const errorEl = document.getElementById('auth-error');
@@ -76,17 +118,39 @@ async function signInWithGoogle(){
   errorEl.innerText = '';
   button.disabled = true;
   try{
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      navigator.standalone === true ||
-      window.matchMedia('(display-mode: standalone)').matches;
-    if(isMobile){
+    if(isMobileAuthFlow()){
       await signInWithRedirect(auth, googleProvider);
       return;
     }
-    await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    rememberDriveCredential(result);
   } catch(err){
     console.error(err);
     errorEl.innerText = `Sign-in failed (${err.code || 'unknown error'}). Check Google provider and authorized domain settings, then try again.`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function connectGoogleDrive(){
+  const button = document.getElementById('drive-connect-btn');
+  const status = document.getElementById('drive-access-status');
+  if(!auth.currentUser) return;
+
+  status.innerText = '';
+  button.disabled = true;
+  try{
+    if(isMobileAuthFlow()){
+      await reauthenticateWithRedirect(auth.currentUser, googleProvider);
+      return;
+    }
+    const result = await reauthenticateWithPopup(auth.currentUser, googleProvider);
+    if(!rememberDriveCredential(result)){
+      status.innerText = 'Google Drive permission was not returned. Please try connecting again.';
+    }
+  } catch(err){
+    console.error(err);
+    status.innerText = `Drive connection failed (${err.code || 'unknown error'}).`;
   } finally {
     button.disabled = false;
   }
@@ -153,7 +217,13 @@ function sanitizeData(data){
     shopping: data.shopping || { Grocery: [], Costco: [], Indian: [], Amazon: [], Walmart: [] },
     meals: data.meals || {},
     workouts: cleanWorkouts,
-    events: cleanEvents
+    events: cleanEvents,
+    storageTotes: Array.isArray(data.storageTotes) ? data.storageTotes.map(tote => ({
+      id: tote.id || (Date.now() + Math.random()),
+      name: tote.name || '',
+      contents: tote.contents || '',
+      photoIds: Array.isArray(tote.photoIds) ? tote.photoIds.filter(id => /^[A-Za-z0-9_-]+$/.test(id)) : []
+    })) : DEFAULT_STORAGE_TOTES.map(tote => ({ ...tote, photoIds: [...tote.photoIds] }))
   };
 }
 
@@ -190,6 +260,10 @@ function loadState(){
 onAuthStateChanged(auth, (user)=>{
   const overlay = document.getElementById('auth-overlay');
   if(!user){
+    driveAccessToken = null;
+    driveTokenUserId = null;
+    driveTokenExpiresAt = 0;
+    revokeDrivePhotoUrls();
     if(unsubscribeRemoteState){
       unsubscribeRemoteState();
       unsubscribeRemoteState = null;
@@ -203,10 +277,15 @@ onAuthStateChanged(auth, (user)=>{
   loadState();
 });
 
-getRedirectResult(auth).catch(err=>{
+getRedirectResult(auth).then(result=>{
+  if(result) rememberDriveCredential(result);
+}).catch(err=>{
   console.error(err);
-  document.getElementById('auth-error').innerText =
+  const authError = document.getElementById('auth-error');
+  const driveStatus = document.getElementById('drive-access-status');
+  if(authError) authError.innerText =
     `Sign-in failed (${err.code || 'unknown error'}). Check Firebase Authentication settings, then try again.`;
+  if(driveStatus) driveStatus.innerText = `Drive connection failed (${err.code || 'unknown error'}).`;
 });
 
 document.addEventListener('focusout', ()=>{
@@ -1369,6 +1448,190 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+function driveFileId(value){
+  const input = value.trim();
+  const pathMatch = input.match(/\/d\/([A-Za-z0-9_-]+)/);
+  const queryMatch = input.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if(pathMatch) return pathMatch[1];
+  if(queryMatch) return queryMatch[1];
+  return /^[A-Za-z0-9_-]+$/.test(input) ? input : '';
+}
+
+function showStorageEditor(toteId = null){
+  const editor = document.getElementById('storage-editor');
+  const tote = state.storageTotes.find(item => item.id === toteId);
+  document.getElementById('storage-editor-title').innerText = tote ? 'Edit Tote' : 'Add Tote';
+  document.getElementById('storage-tote-id').value = tote ? tote.id : '';
+  document.getElementById('storage-name-input').value = tote ? tote.name : '';
+  document.getElementById('storage-contents-input').value = tote ? tote.contents : '';
+  document.getElementById('storage-photos-input').value = tote ? tote.photoIds.join('\n') : '';
+  editor.hidden = false;
+  document.getElementById('storage-name-input').focus();
+}
+
+function hideStorageEditor(){
+  document.getElementById('storage-editor').hidden = true;
+}
+
+function saveStorageTote(){
+  const idInput = document.getElementById('storage-tote-id');
+  const name = document.getElementById('storage-name-input').value.trim();
+  const status = document.getElementById('storage-edit-status');
+  if(!name){
+    status.innerText = 'Enter a tote name.';
+    return;
+  }
+
+  const photoLines = document.getElementById('storage-photos-input').value.split('\n').map(line => line.trim()).filter(Boolean);
+  const photoIds = photoLines.map(driveFileId);
+  if(photoIds.some(id => !id)){
+    status.innerText = 'One or more photo links are invalid. Paste a Drive file link or file ID per line.';
+    return;
+  }
+
+  const tote = {
+    id: idInput.value ? Number(idInput.value) : Date.now() + Math.random(),
+    name,
+    contents: document.getElementById('storage-contents-input').value.trim(),
+    photoIds: [...new Set(photoIds)]
+  };
+  const existingIndex = state.storageTotes.findIndex(item => item.id === tote.id);
+  if(existingIndex === -1) state.storageTotes.push(tote);
+  else state.storageTotes[existingIndex] = tote;
+
+  status.innerText = '';
+  hideStorageEditor();
+  renderStorage();
+  scheduleSave();
+}
+
+function deleteStorageTote(toteId){
+  if(!confirm('Delete this tote from the inventory?')) return;
+  state.storageTotes = state.storageTotes.filter(tote => tote.id !== toteId);
+  renderStorage();
+  scheduleSave();
+}
+
+async function fetchDrivePhoto(fileId){
+  if(!hasDriveAccess()) throw new Error('Connect Google Drive to view this photo.');
+  if(drivePhotoUrls.has(fileId)) return drivePhotoUrls.get(fileId);
+  if(drivePhotoRequests.has(fileId)) return drivePhotoRequests.get(fileId);
+
+  const token = driveAccessToken;
+  const request = (async ()=>{
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if(!response.ok){
+      const body = await response.json().catch(()=>({}));
+      const error = new Error(body.error?.message || `Drive request failed (${response.status}).`);
+      error.status = response.status;
+      throw error;
+    }
+    const imageBlob = await response.blob();
+    if(!imageBlob.type.startsWith('image/')) throw new Error('This Drive file is not an image.');
+    if(token !== driveAccessToken || driveTokenUserId !== auth.currentUser?.uid){
+      throw new Error('Drive connection changed. Reconnect to view photos.');
+    }
+    const objectUrl = URL.createObjectURL(imageBlob);
+    drivePhotoUrls.set(fileId, objectUrl);
+    return objectUrl;
+  })().finally(()=>drivePhotoRequests.delete(fileId));
+  drivePhotoRequests.set(fileId, request);
+  return request;
+}
+
+function observeStoragePhotos(){
+  const images = document.querySelectorAll('[data-drive-photo]');
+  const load = image => {
+    const fileId = image.dataset.drivePhoto;
+    fetchDrivePhoto(fileId).then(url=>{
+      if(!image.isConnected) return;
+      image.src = url;
+      image.closest('.storage-photo-button').disabled = false;
+    }).catch(err=>{
+      if(!image.isConnected) return;
+      image.alt = err.message;
+      image.closest('.storage-photo-button').title = err.message;
+      image.closest('.storage-photo-button').classList.add('photo-unavailable');
+      if(err.status === 401){
+        driveAccessToken = null;
+        driveTokenExpiresAt = 0;
+        renderStorage();
+      }
+    });
+  };
+
+  if(!hasDriveAccess()) return;
+  if('IntersectionObserver' in window){
+    const observer = new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          observer.unobserve(entry.target);
+          load(entry.target);
+        }
+      });
+    }, { rootMargin: '160px' });
+    images.forEach(image=>{
+      if(drivePhotoUrls.has(image.dataset.drivePhoto)){
+        image.src = drivePhotoUrls.get(image.dataset.drivePhoto);
+        image.closest('.storage-photo-button').disabled = false;
+      } else {
+        observer.observe(image);
+      }
+    });
+  } else {
+    images.forEach(load);
+  }
+}
+
+function renderStorage(){
+  const list = document.getElementById('storage-tote-list');
+  if(!list) return;
+  const query = document.getElementById('storage-search-input').value.trim().toLowerCase();
+  const status = document.getElementById('drive-access-status');
+  const connectButton = document.getElementById('drive-connect-btn');
+  const hasAccess = hasDriveAccess();
+  status.innerText = hasAccess ? 'Google Drive connected for this session.' : 'Connect Google Drive to view private photos.';
+  connectButton.innerText = hasAccess ? 'Reconnect Google Drive' : 'Connect Google Drive';
+
+  const totes = state.storageTotes.filter(tote =>
+    `${tote.name} ${tote.contents}`.toLowerCase().includes(query)
+  );
+  if(totes.length === 0){
+    list.innerHTML = `<p class="storage-empty">${state.storageTotes.length ? 'No totes match that search.' : 'No totes added yet.'}</p>`;
+    return;
+  }
+
+  list.innerHTML = totes.map(tote=>`
+    <article class="storage-tote">
+      <div class="storage-tote-header">
+        <div>
+          <h2>${escapeHtml(tote.name)}</h2>
+        </div>
+        <div class="storage-tote-actions">
+          <button type="button" onclick="showStorageEditor(${tote.id})" aria-label="Edit ${escapeHtml(tote.name)}">Edit</button>
+          <button type="button" onclick="deleteStorageTote(${tote.id})" aria-label="Delete ${escapeHtml(tote.name)}">×</button>
+        </div>
+      </div>
+      ${tote.contents ? `<p class="storage-contents">${escapeHtml(tote.contents)}</p>` : ''}
+      ${tote.photoIds.length ? `<div class="storage-photo-grid">${tote.photoIds.map((fileId, index)=>`
+        <button type="button" class="storage-photo-button" onclick="openStoragePhoto('${fileId}')" disabled title="Loading photo">
+          <img data-drive-photo="${fileId}" alt="${escapeHtml(tote.name)} photo ${index + 1}" loading="lazy">
+        </button>
+      `).join('')}</div>` : ''}
+    </article>
+  `).join('');
+  observeStoragePhotos();
+}
+
+function openStoragePhoto(fileId){
+  const imageUrl = drivePhotoUrls.get(fileId);
+  if(!imageUrl) return;
+  document.getElementById('storage-photo-full').src = imageUrl;
+  document.getElementById('storage-photo-dialog').showModal();
+}
+
 function renderAll(){
   renderTasks();
   renderShopping();
@@ -1376,6 +1639,7 @@ function renderAll(){
   renderTemplates();
   renderWorkouts();
   renderEvents();
+  renderStorage();
   initArchiveVisibility();
 
   const dateInput = document.getElementById('event-date-input');
@@ -1387,7 +1651,8 @@ Object.assign(window, {
   promptAddTemplate, removeTemplate,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
-  updateMeal, toggleArchiveVisibility, signInWithGoogle, signOutDashboard,
+  updateMeal, toggleArchiveVisibility, signInWithGoogle, signOutDashboard, connectGoogleDrive,
+  showStorageEditor, hideStorageEditor, saveStorageTote, deleteStorageTote, openStoragePhoto, renderStorage,
   setWorkoutType, setWorkoutExercise, setRunParam, generate531Program, setWorkoutSetToggle, setAmrapReps, selectCalendarDate, changeMonth,
   addEvent, deleteEvent, changeEventsMonth
 });

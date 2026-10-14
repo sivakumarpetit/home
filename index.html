@@ -37,6 +37,9 @@
         <button type="button" class="nav-btn" id="nav-workouts" onclick="switchSidebarTab('workouts')">
           <span class="nav-icon">🏋️</span> Workouts
         </button>
+        <button type="button" class="nav-btn" id="nav-storage" onclick="switchSidebarTab('storage')">
+          <span class="nav-icon">🧰</span> Storage
+        </button>
       </nav>
       <div class="sidebar-footer">
         <button type="button" class="lock-btn" onclick="signOutDashboard()">↪ Sign out</button>
@@ -252,8 +255,46 @@
         <div id="workout-active-day-container"></div>
       </section>
 
+      <section id="section-storage" class="view-section">
+        <header class="section-header">
+          <h1>Home Storage</h1>
+        </header>
+
+        <div class="storage-toolbar">
+          <input type="search" id="storage-search-input" placeholder="Search totes or contents" oninput="renderStorage()">
+          <button type="button" class="storage-add-btn" onclick="showStorageEditor()">+ Add Tote</button>
+        </div>
+
+        <div class="storage-drive-access">
+          <span id="drive-access-status" aria-live="polite">Connect Google Drive to view private photos.</span>
+          <button type="button" id="drive-connect-btn" onclick="connectGoogleDrive()">Connect Google Drive</button>
+        </div>
+
+        <div id="storage-editor" class="storage-editor" hidden>
+          <h2 id="storage-editor-title">Add Tote</h2>
+          <input type="hidden" id="storage-tote-id">
+          <div class="storage-form-grid">
+            <label class="storage-form-wide">Tote name<input type="text" id="storage-name-input" maxlength="80" placeholder="Tote 01"></label>
+            <label class="storage-form-wide">Contents and keywords<textarea id="storage-contents-input" rows="3" placeholder="Holiday lights, extension cords"></textarea></label>
+            <label class="storage-form-wide">Google Drive photo links or file IDs<textarea id="storage-photos-input" rows="3" placeholder="Paste a Drive link or file ID, one per line"></textarea></label>
+          </div>
+          <p id="storage-edit-status" class="storage-edit-status" aria-live="polite"></p>
+          <div class="storage-editor-actions">
+            <button type="button" class="storage-add-btn" onclick="saveStorageTote()">Save Tote</button>
+            <button type="button" class="storage-cancel-btn" onclick="hideStorageEditor()">Cancel</button>
+          </div>
+        </div>
+
+        <div id="storage-tote-list" class="storage-tote-list"></div>
+      </section>
+
     </main>
   </div>
+
+  <dialog id="storage-photo-dialog" class="storage-photo-dialog" onclick="if(event.target===this) this.close()">
+    <button type="button" class="storage-photo-close" onclick="this.closest('dialog').close()" aria-label="Close photo">×</button>
+    <img id="storage-photo-full" alt="Tote photo">
+  </dialog>
 
   <script type="module" src="app.js"></script>
 </body>

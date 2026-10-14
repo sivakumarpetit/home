@@ -31,6 +31,11 @@ A real-time, touch-optimized progressive family dashboard designed for household
 - **Events Monthly Calendar**: Monthly calendar grid featuring visual dot indicators on days with scheduled events.
 - **Rolling 7-Day Agenda**: Chronological agenda view displaying all events scheduled over the next 7 days.
 
+### 🧰 Home Storage
+- **Tote Inventory**: Search tote names and contents; edit and remove tote records.
+- **Private Drive Photos**: Display images from Google Drive in the app using a session-only read token. Add Drive file links or IDs to each tote.
+- **Setup**: Enable the Google Drive API and share the photo files with each household account. The app requests read-only Drive access when connecting.
+
 ---
 
 ## 🛠️ Technology Stack
