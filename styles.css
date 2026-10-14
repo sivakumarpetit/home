@@ -298,8 +298,6 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 
 .cal-cell.type-running { background: var(--clay); color: #fff; border-color: var(--clay); font-weight: 600; }
 .cal-cell.type-strength { background: var(--olive); color: #fff; border-color: var(--olive); font-weight: 600; }
-.cal-cell.type-rest { background: var(--rest-gray); color: var(--ink); border-color: var(--rest-gray); font-weight: 500; }
-
 /* FULL-CELL COLOR HIGHLIGHT FOR DAYS WITH SCHEDULED EVENTS */
 .cal-cell.has-event {
   background: var(--clay);

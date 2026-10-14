@@ -732,6 +732,13 @@ function setWorkoutType(dateKey, type){
   scheduleSave();
 }
 
+function setWorkoutExercise(dateKey, exercise){
+  const curr = getWorkout(dateKey);
+  state.workouts[dateKey] = { ...curr, exercise };
+  renderWorkoutStats();
+  scheduleSave();
+}
+
 function setRunParam(dateKey, field, val){
   const curr = getWorkout(dateKey);
   state.workouts[dateKey] = {
@@ -882,6 +889,7 @@ function renderWorkoutStats(){
   let thisYearCount = 0;
   let totalMiles = 0;
   const liftCounts = { "Bench Press": 0, "Squat": 0, "Deadlift": 0, "Overhead Press": 0 };
+  const liftLastDate = {};
 
   for(let i = 0; i >= -6; i--){
     const k = getIsoDateKey(i);
@@ -918,17 +926,25 @@ function renderWorkoutStats(){
       totalMiles += w.mileage;
     }
 
-    if(w.type === 'strength' && w.exercise){
-      if(liftCounts[w.exercise] !== undefined) liftCounts[w.exercise]++;
+    if(w.type === 'strength' && w.exercise && w.trainingMax > 0){
+      if(liftCounts[w.exercise] !== undefined){
+        liftCounts[w.exercise]++;
+        if(!liftLastDate[w.exercise] || dateStr > liftLastDate[w.exercise]){
+          liftLastDate[w.exercise] = dateStr;
+        }
+      }
     }
   });
 
   let topLift = '—';
   let maxLiftCount = 0;
-  Object.keys(liftCounts).forEach(l => {
-    if(liftCounts[l] > maxLiftCount){
-      maxLiftCount = liftCounts[l];
-      topLift = l;
+  let topLiftDate = '';
+  Object.keys(liftCounts).forEach(lift => {
+    if(liftCounts[lift] > maxLiftCount ||
+      (liftCounts[lift] > 0 && liftCounts[lift] === maxLiftCount && liftLastDate[lift] > topLiftDate)){
+      maxLiftCount = liftCounts[lift];
+      topLiftDate = liftLastDate[lift];
+      topLift = lift;
     }
   });
 
@@ -976,7 +992,6 @@ function renderWorkoutCalendar(){
     let typeClass = '';
     if(w.type === 'running') typeClass = ' type-running';
     else if(w.type === 'strength') typeClass = ' type-strength';
-    else if(w.type === 'rest') typeClass = ' type-rest';
 
     const isWeekendClass = isWeekend ? ' is-weekend' : '';
     const isTodayClass = dateKey === todayIso ? ' is-today' : '';
@@ -1121,7 +1136,7 @@ function renderDayCard(dateKey){
         <div class="bbb-form-grid">
           <div class="bbb-form-group">
             <label>Exercise</label>
-            <select id="ex-${dateKey}">
+            <select id="ex-${dateKey}" onchange="setWorkoutExercise('${dateKey}', this.value)">
               ${LIFT_OPTIONS.map(l => `<option value="${l}" ${w.exercise === l ? 'selected' : ''}>${l}</option>`).join('')}
             </select>
           </div>
@@ -1351,6 +1366,6 @@ Object.assign(window, {
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
   updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard,
-  setWorkoutType, setRunParam, generate531Program, setWorkoutSetToggle, setAmrapReps, selectCalendarDate, changeMonth,
+  setWorkoutType, setWorkoutExercise, setRunParam, generate531Program, setWorkoutSetToggle, setAmrapReps, selectCalendarDate, changeMonth,
   addEvent, deleteEvent, changeEventsMonth
 });
