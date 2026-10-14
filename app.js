@@ -20,7 +20,9 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
+const driveProvider = new GoogleAuthProvider();
+driveProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
+const DRIVE_CONNECT_PENDING_KEY = 'drive_connect_pending';
 const stateRef = doc(db, "family-dashboard", "shared-state");
 
 const DEFAULT_TEMPLATES = [
@@ -122,8 +124,7 @@ async function signInWithGoogle(){
       await signInWithRedirect(auth, googleProvider);
       return;
     }
-    const result = await signInWithPopup(auth, googleProvider);
-    rememberDriveCredential(result);
+    await signInWithPopup(auth, googleProvider);
   } catch(err){
     console.error(err);
     errorEl.innerText = `Sign-in failed (${err.code || 'unknown error'}). Check Google provider and authorized domain settings, then try again.`;
@@ -141,10 +142,11 @@ async function connectGoogleDrive(){
   button.disabled = true;
   try{
     if(isMobileAuthFlow()){
-      await reauthenticateWithRedirect(auth.currentUser, googleProvider);
+      sessionStorage.setItem(DRIVE_CONNECT_PENDING_KEY, 'true');
+      await reauthenticateWithRedirect(auth.currentUser, driveProvider);
       return;
     }
-    const result = await reauthenticateWithPopup(auth.currentUser, googleProvider);
+    const result = await reauthenticateWithPopup(auth.currentUser, driveProvider);
     if(!rememberDriveCredential(result)){
       status.innerText = 'Google Drive permission was not returned. Please try connecting again.';
     }
@@ -278,8 +280,11 @@ onAuthStateChanged(auth, (user)=>{
 });
 
 getRedirectResult(auth).then(result=>{
-  if(result) rememberDriveCredential(result);
+  const isDriveConnect = sessionStorage.getItem(DRIVE_CONNECT_PENDING_KEY) === 'true';
+  sessionStorage.removeItem(DRIVE_CONNECT_PENDING_KEY);
+  if(result && isDriveConnect) rememberDriveCredential(result);
 }).catch(err=>{
+  sessionStorage.removeItem(DRIVE_CONNECT_PENDING_KEY);
   console.error(err);
   const authError = document.getElementById('auth-error');
   const driveStatus = document.getElementById('drive-access-status');
