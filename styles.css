@@ -52,18 +52,18 @@ body {
 }
 .pin-card h2 { margin: 0 0 8px; font-size: 20px; color: var(--olive-dark); }
 .pin-card p { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: var(--muted); margin: 0 0 18px; }
-.google-sign-in-btn {
-  width: 100%; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px;
-  padding: 11px 16px; border: none; background: var(--olive); color: #fff;
-  border-radius: 6px; cursor: pointer;
+.pin-input-group { display: flex; gap: 8px; }
+.pin-input-group input {
+  min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 6px; outline: none; font: 15px 'Helvetica Neue', Arial, sans-serif;
 }
-.google-sign-in-btn:disabled { opacity: 0.65; cursor: wait; }
-.google-sign-in-btn:hover:not(:disabled) { background: var(--olive-dark); }
-.google-sign-in-btn:focus-visible { outline: 2px solid var(--olive-dark); outline-offset: 2px; }
+.pin-input-group input:focus { border-color: var(--olive); }
+.pin-input-group button {
+  padding: 10px 16px; border: 0; border-radius: 6px; background: var(--olive);
+  color: #fff; cursor: pointer; font: 14px 'Helvetica Neue', Arial, sans-serif;
+}
+.pin-input-group button:hover { background: var(--olive-dark); }
 .pin-error { color: var(--clay) !important; margin-top: 10px !important; font-weight: 500; }
-.pin-card .google-sign-in-btn {
-  font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; padding: 10px 16px;
-}
 
 /* APP LAYOUT & TOGGLEABLE SIDEBAR */
 .app-layout {
@@ -444,9 +444,6 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 .storage-add-btn { color: #fff; background: var(--olive); }
 .storage-add-btn:hover { background: var(--olive-dark); }
 .storage-cancel-btn { color: var(--ink); border-color: var(--line); background: #fff; }
-.storage-drive-access { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font: 12px 'Helvetica Neue', Arial, sans-serif; color: var(--muted); }
-.storage-drive-access button { color: var(--olive-dark); background: #fff; }
-.storage-drive-access button:disabled { opacity: .6; }
 .storage-editor { margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
 .storage-editor[hidden] { display: none; }
 .storage-editor h2 { margin: 0 0 12px; font-size: 17px; color: var(--olive-dark); }
@@ -466,20 +463,13 @@ td input:focus { outline: 1px solid var(--olive); border-radius: 3px; }
 .storage-tote-actions button:last-child:hover { border-color: var(--clay); color: var(--clay); }
 .storage-contents { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.5 'Helvetica Neue', Arial, sans-serif; }
 .storage-photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.storage-photo-button { overflow: hidden; aspect-ratio: 4 / 3; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: #f5f3ee; cursor: zoom-in; }
-.storage-photo-button:disabled { cursor: wait; }
-.storage-photo-button img { display: block; width: 100%; height: 100%; object-fit: cover; color: var(--muted); font: 11px 'Helvetica Neue', Arial, sans-serif; }
-.storage-photo-button.photo-unavailable { cursor: default; }
+.storage-photo-link { padding: 10px; border: 1px solid var(--line); border-radius: 5px; background: #f5f3ee; color: var(--olive-dark); font: 12px 'Helvetica Neue', Arial, sans-serif; text-align: center; text-decoration: none; }
+.storage-photo-link:hover { border-color: var(--olive); }
 .storage-empty { grid-column: 1 / -1; color: var(--muted); font: italic 13px 'Helvetica Neue', Arial, sans-serif; }
-.storage-photo-dialog { position: fixed; max-width: min(94vw, 1100px); max-height: 92vh; padding: 32px 12px 12px; border: 1px solid var(--line); border-radius: 8px; background: #111; }
-.storage-photo-dialog::backdrop { background: rgba(0, 0, 0, .78); }
-.storage-photo-dialog img { display: block; max-width: calc(94vw - 24px); max-height: calc(92vh - 48px); object-fit: contain; }
-.storage-photo-close { position: absolute; top: 4px; right: 7px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: #333; color: #fff; font-size: 22px; cursor: pointer; }
 
 @media (max-width: 520px) {
   .storage-toolbar { flex-wrap: wrap; }
   .storage-toolbar input { flex-basis: 100%; }
   .storage-form-grid { grid-template-columns: 1fr; }
   .storage-form-wide { grid-column: auto; }
-  .storage-drive-access { align-items: flex-start; flex-direction: column; }
 }

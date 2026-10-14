@@ -33,8 +33,8 @@ A real-time, touch-optimized progressive family dashboard designed for household
 
 ### 🧰 Home Storage
 - **Tote Inventory**: Search tote names and contents; edit and remove tote records.
-- **Private Drive Photos**: Display images from Google Drive in the app using a session-only read token. Add Drive file links or IDs to each tote.
-- **Setup**: Enable the Google Drive API and share the photo files with each household account. The app requests read-only Drive access when connecting.
+- **Drive Photo Links**: Store Drive links or file IDs with each tote; photo links open in Google Drive and follow Drive's sharing permissions.
+- **Access**: The dashboard uses a local PIN screen. This is a convenience gate, not database security; Firestore rules control data access.
 
 ---
 
