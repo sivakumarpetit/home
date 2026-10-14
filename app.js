@@ -81,6 +81,7 @@ let saveTimer = null;
 let remoteVersion = null;
 let pendingRemoteData = null;
 let unsubscribeRemoteState = null;
+let hasConfirmedRemoteState = false;
 let driveAccessToken = null;
 let driveTokenUserId = null;
 let driveTokenExpiresAt = 0;
@@ -232,36 +233,48 @@ function sanitizeData(data){
 function applyRemoteData(data){
   state = sanitizeData(data);
   remoteVersion = JSON.stringify(data);
+  hasConfirmedRemoteState = true;
   renderAll();
   setSyncStatus('updated ' + new Date().toLocaleTimeString());
 }
 
 function loadState(){
+  hasConfirmedRemoteState = false;
   setSyncStatus('connecting…');
   if(unsubscribeRemoteState) unsubscribeRemoteState();
-  unsubscribeRemoteState = onSnapshot(stateRef, (snap)=>{
+  unsubscribeRemoteState = onSnapshot(stateRef, { includeMetadataChanges: true }, (snap)=>{
+    if(snap.metadata.fromCache){
+      setSyncStatus('checking cloud data…');
+      return;
+    }
     if(!snap.exists()){
+      hasConfirmedRemoteState = true;
       setSyncStatus('ready — add something to get started');
       renderAll();
       return;
     }
     const data = snap.data();
     const json = JSON.stringify(data);
-    if(json === remoteVersion) return;
+    if(json === remoteVersion){
+      hasConfirmedRemoteState = true;
+      return;
+    }
     if(isEditingSomething()){
       pendingRemoteData = data;
       return;
     }
     applyRemoteData(data);
   }, (err)=>{
+    hasConfirmedRemoteState = false;
     console.error(err);
-    setSyncStatus('connection error — check console');
+    setSyncStatus('connection error — dashboard is read-only');
   });
 }
 
 onAuthStateChanged(auth, (user)=>{
   const overlay = document.getElementById('auth-overlay');
   if(!user){
+    hasConfirmedRemoteState = false;
     driveAccessToken = null;
     driveTokenUserId = null;
     driveTokenExpiresAt = 0;
@@ -303,11 +316,16 @@ document.addEventListener('focusout', ()=>{
 });
 
 function scheduleSave(){
+  if(!hasConfirmedRemoteState){
+    setSyncStatus('loading cloud data — changes not saved');
+    return;
+  }
   clearTimeout(saveTimer);
   setSyncStatus('saving…');
   saveTimer = setTimeout(saveToFirestore, 500);
 }
 async function saveToFirestore(){
+  if(!hasConfirmedRemoteState) return;
   try{
     await setDoc(stateRef, state);
     remoteVersion = JSON.stringify(state);
