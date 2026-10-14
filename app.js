@@ -2,6 +2,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getFirestore, doc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB-2jQpNIOtTjX47aOZExkCCY1mir9axA4",
@@ -13,9 +16,9 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const googleProvider = new GoogleAuthProvider();
 const stateRef = doc(db, "family-dashboard", "shared-state");
-
-const DASHBOARD_PIN = "258963"; 
 
 const DEFAULT_TEMPLATES = [
   "🧺 Laundry", "🍳 Cooking", "🗑️ Trash Pickup", "🛒 Grocery Run", 
@@ -64,40 +67,30 @@ let eventsViewMonth = new Date().getMonth();
 let saveTimer = null;
 let remoteVersion = null;
 let pendingRemoteData = null;
+let unsubscribeRemoteState = null;
 
-function checkPinAuth(){
-  const savedPin = localStorage.getItem('dash_pin_auth');
-  const overlay = document.getElementById('pin-overlay');
-  if(savedPin === DASHBOARD_PIN){
-    overlay.style.display = 'none';
-    loadState();
-  } else {
-    overlay.style.display = 'flex';
+async function signInWithGoogle(){
+  const errorEl = document.getElementById('auth-error');
+  const button = document.getElementById('google-sign-in-btn');
+  errorEl.innerText = '';
+  button.disabled = true;
+  try{
+    await signInWithPopup(auth, googleProvider);
+  } catch(err){
+    console.error(err);
+    errorEl.innerText = 'Sign-in failed. Check Google provider and authorized domain settings, then try again.';
+  } finally {
+    button.disabled = false;
   }
 }
 
-function verifyPin(){
-  const input = document.getElementById('pin-input');
-  const errEl = document.getElementById('pin-error');
-  const val = input.value.trim();
-
-  if(val === DASHBOARD_PIN){
-    localStorage.setItem('dash_pin_auth', val);
-    document.getElementById('pin-overlay').style.display = 'none';
-    errEl.innerText = '';
-    loadState();
-  } else {
-    errEl.innerText = 'Incorrect PIN. Please try again.';
-    input.value = '';
-    input.focus();
+async function signOutDashboard(){
+  try{
+    await signOut(auth);
+  } catch(err){
+    console.error(err);
+    setSyncStatus('sign-out failed');
   }
-}
-
-function lockDashboard(){
-  localStorage.removeItem('dash_pin_auth');
-  document.getElementById('pin-input').value = '';
-  document.getElementById('pin-error').innerText = '';
-  document.getElementById('pin-overlay').style.display = 'flex';
 }
 
 function setSyncStatus(text){
@@ -165,7 +158,8 @@ function applyRemoteData(data){
 
 function loadState(){
   setSyncStatus('connecting…');
-  onSnapshot(stateRef, (snap)=>{
+  if(unsubscribeRemoteState) unsubscribeRemoteState();
+  unsubscribeRemoteState = onSnapshot(stateRef, (snap)=>{
     if(!snap.exists()){
       setSyncStatus('ready — add something to get started');
       renderAll();
@@ -184,6 +178,22 @@ function loadState(){
     setSyncStatus('connection error — check console');
   });
 }
+
+onAuthStateChanged(auth, (user)=>{
+  const overlay = document.getElementById('auth-overlay');
+  if(!user){
+    if(unsubscribeRemoteState){
+      unsubscribeRemoteState();
+      unsubscribeRemoteState = null;
+    }
+    clearTimeout(saveTimer);
+    overlay.style.display = 'flex';
+    setSyncStatus('signed out');
+    return;
+  }
+  overlay.style.display = 'none';
+  loadState();
+});
 
 document.addEventListener('focusout', ()=>{
   setTimeout(()=>{
@@ -1358,14 +1368,12 @@ function renderAll(){
   if(dateInput && !dateInput.value) dateInput.value = getIsoDateKey(0);
 }
 
-checkPinAuth();
-
 Object.assign(window, {
   toggleSidebar, switchSidebarTab, switchHQSubTab, addTask, updateTaskText, toggleTask, deleteTask, setTaskFilter, addQuickTemplateTask, cycleAssignee,
   promptAddTemplate, removeTemplate,
   addStore, removeStore, renameStore,
   addShoppingItem, toggleShoppingItem, clearCheckedShopping,
-  updateMeal, toggleArchiveVisibility, verifyPin, lockDashboard,
+  updateMeal, toggleArchiveVisibility, signInWithGoogle, signOutDashboard,
   setWorkoutType, setWorkoutExercise, setRunParam, generate531Program, setWorkoutSetToggle, setAmrapReps, selectCalendarDate, changeMonth,
   addEvent, deleteEvent, changeEventsMonth
 });

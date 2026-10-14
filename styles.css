@@ -52,18 +52,18 @@ body {
 }
 .pin-card h2 { margin: 0 0 8px; font-size: 20px; color: var(--olive-dark); }
 .pin-card p { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: var(--muted); margin: 0 0 18px; }
-.pin-input-group { display: flex; gap: 8px; }
-.pin-input-group input {
-  font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 15px; padding: 10px 12px;
-  border: 1px solid var(--line); border-radius: 6px; flex: 1; outline: none;
+.google-sign-in-btn {
+  width: 100%; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px;
+  padding: 11px 16px; border: none; background: var(--olive); color: #fff;
+  border-radius: 6px; cursor: pointer;
 }
-.pin-input-group input:focus { border-color: var(--olive); }
-.pin-input-group button {
-  font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; padding: 10px 16px;
-  border: none; background: var(--olive); color: #fff; border-radius: 6px; cursor: pointer;
-}
-.pin-input-group button:hover { background: var(--olive-dark); }
+.google-sign-in-btn:disabled { opacity: 0.65; cursor: wait; }
+.google-sign-in-btn:hover:not(:disabled) { background: var(--olive-dark); }
+.google-sign-in-btn:focus-visible { outline: 2px solid var(--olive-dark); outline-offset: 2px; }
 .pin-error { color: var(--clay) !important; margin-top: 10px !important; font-weight: 500; }
+.pin-card .google-sign-in-btn {
+  font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; padding: 10px 16px;
+}
 
 /* APP LAYOUT & TOGGLEABLE SIDEBAR */
 .app-layout {

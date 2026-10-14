@@ -11,16 +11,13 @@
 </head>
 <body>
 
-  <!-- SECURITY PIN OVERLAY -->
-  <div id="pin-overlay" class="pin-overlay">
+  <!-- GOOGLE SIGN-IN OVERLAY -->
+  <div id="auth-overlay" class="pin-overlay">
     <div class="pin-card">
       <h2>Family HQ</h2>
-      <p>Enter PIN to access your family hub</p>
-      <div class="pin-input-group">
-        <input type="password" id="pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Enter PIN" onkeydown="if(event.key==='Enter') verifyPin()">
-        <button type="button" onclick="verifyPin()">Unlock</button>
-      </div>
-      <p id="pin-error" class="pin-error"></p>
+      <p>Sign in with your Google account to access your family hub.</p>
+      <button type="button" id="google-sign-in-btn" class="google-sign-in-btn" onclick="signInWithGoogle()">Sign in with Google</button>
+      <p id="auth-error" class="pin-error" aria-live="polite"></p>
     </div>
   </div>
 
@@ -42,7 +39,7 @@
         </button>
       </nav>
       <div class="sidebar-footer">
-        <button type="button" class="lock-btn" onclick="lockDashboard()">🔒 Lock</button>
+        <button type="button" class="lock-btn" onclick="signOutDashboard()">↪ Sign out</button>
       </div>
     </aside>
 
